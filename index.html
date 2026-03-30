@@ -109,7 +109,8 @@
 <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-atl-panel border-r border-atl-border flex flex-col transition-transform duration-300 sidebar-closed lg:sidebar-open lg:translate-x-0">
     <!-- Logo -->
     <div class="flex items-center gap-3 px-5 py-4 border-b border-atl-border">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-atl-navy to-atl-blue flex items-center justify-center text-white font-extrabold text-sm tracking-tight">ATL</div>
+        <img src="https://www.atlantaga.gov/home/showpublishedimage/19579/638237457477530000" alt="City of Atlanta Seal" class="w-10 h-10 rounded-xl object-cover" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-atl-navy to-atl-blue items-center justify-center text-white font-extrabold text-sm tracking-tight hidden">ATL</div>
         <div>
             <h1 class="text-sm font-bold text-white leading-tight">Smart City</h1>
             <p class="text-[10px] text-atl-gold font-medium tracking-wider uppercase">Command Center</p>
@@ -166,10 +167,19 @@
         </div>
     </nav>
 
-    <!-- Footer -->
-    <div class="px-5 py-3 border-t border-atl-border text-[10px] text-gray-500 leading-relaxed">
-        City of Atlanta &bull; Mayor Andre Dickens<br>
-        &copy; 2026 ATL Smart City Platform
+    <!-- Mayor & Footer -->
+    <div class="px-4 py-3 border-t border-atl-border">
+        <div class="flex items-center gap-3 mb-2">
+            <img src="https://www.atlantaga.gov/home/showpublishedimage/23906/639014980469100000" alt="Mayor Andre Dickens" class="w-10 h-10 rounded-full object-cover border-2 border-atl-gold/40" onerror="this.style.display='none';">
+            <div>
+                <p class="text-[11px] font-semibold text-white leading-tight">Mayor Andre Dickens</p>
+                <p class="text-[10px] text-gray-500">61st Mayor of Atlanta</p>
+            </div>
+        </div>
+        <p class="text-[10px] text-gray-500 leading-relaxed">
+            City of Atlanta &bull; Est. 1847<br>
+            &copy; 2026 ATL Smart City Platform
+        </p>
     </div>
 </aside>
 
@@ -207,9 +217,12 @@
 
         <!-- Status Banner -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-                <h2 class="text-lg sm:text-xl font-bold text-white">Atlanta Smart City Dashboard</h2>
-                <p class="text-xs text-gray-400">Real-time city operations &bull; <span id="live-date"></span></p>
+            <div class="flex items-center gap-3">
+                <img src="https://www.atlantaga.gov/home/showpublishedimage/19579/638237457477530000" alt="City of Atlanta" class="h-10 w-10 rounded-full object-cover border border-atl-gold/30 hidden sm:block" onerror="this.style.display='none';">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-white">Atlanta Smart City Dashboard</h2>
+                    <p class="text-xs text-gray-400">Real-time city operations &bull; <span id="live-date"></span></p>
+                </div>
             </div>
             <div class="flex items-center gap-2">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium">
@@ -507,6 +520,46 @@
             </div>
         </div>
 
+        <!-- ─── ATLANTA GOV PROGRAMS ROW ─── -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <a href="https://www.onesafecity.com/" target="_blank" rel="noopener noreferrer" class="group bg-atl-card rounded-xl border border-atl-border overflow-hidden hover:border-atl-blue/50 transition">
+                <div class="relative h-24 overflow-hidden">
+                    <img src="https://www.atlantaga.gov/home/showpublishedimage/22590/638892960960300000" alt="One Safe City" class="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition" onerror="this.parentElement.innerHTML='<div class=\'flex items-center justify-center h-full bg-atl-navy/50\'><i class=\'fa-solid fa-shield-halved text-2xl text-atl-gold\'></i></div>';">
+                </div>
+                <div class="p-2.5">
+                    <p class="text-xs font-semibold text-white">One Safe City</p>
+                    <p class="text-[10px] text-gray-500">Public Safety Initiative</p>
+                </div>
+            </a>
+            <a href="https://www.atlantaga.gov/government/mayor-s-office/moving-atlanta-forward-agenda" target="_blank" rel="noopener noreferrer" class="group bg-atl-card rounded-xl border border-atl-border overflow-hidden hover:border-atl-blue/50 transition">
+                <div class="relative h-24 overflow-hidden">
+                    <img src="https://www.atlantaga.gov/home/showpublishedimage/22078/638839741093230000" alt="Moving Atlanta Forward" class="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition" onerror="this.parentElement.innerHTML='<div class=\'flex items-center justify-center h-full bg-atl-navy/50\'><i class=\'fa-solid fa-arrow-right text-2xl text-atl-gold\'></i></div>';">
+                </div>
+                <div class="p-2.5">
+                    <p class="text-xs font-semibold text-white">Moving ATL Forward</p>
+                    <p class="text-[10px] text-gray-500">Mayor's Agenda</p>
+                </div>
+            </a>
+            <a href="https://www.atlantaga.gov/government/departments/city-planning/neighborhood-planning-units" target="_blank" rel="noopener noreferrer" class="group bg-atl-card rounded-xl border border-atl-border overflow-hidden hover:border-atl-blue/50 transition">
+                <div class="relative h-24 overflow-hidden">
+                    <img src="https://www.atlantaga.gov/home/showpublishedimage/22596/638892960963770000" alt="Neighborhood Planning" class="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition" onerror="this.parentElement.innerHTML='<div class=\'flex items-center justify-center h-full bg-atl-navy/50\'><i class=\'fa-solid fa-map text-2xl text-atl-gold\'></i></div>';">
+                </div>
+                <div class="p-2.5">
+                    <p class="text-xs font-semibold text-white">25 NPUs</p>
+                    <p class="text-[10px] text-gray-500">Neighborhood Planning</p>
+                </div>
+            </a>
+            <a href="https://www.100atl.com/office-of-resilience" target="_blank" rel="noopener noreferrer" class="group bg-atl-card rounded-xl border border-atl-border overflow-hidden hover:border-atl-blue/50 transition">
+                <div class="relative h-24 overflow-hidden">
+                    <img src="https://www.atlantaga.gov/home/showpublishedimage/22598/638892960964530000" alt="Sustainability" class="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition" onerror="this.parentElement.innerHTML='<div class=\'flex items-center justify-center h-full bg-atl-navy/50\'><i class=\'fa-solid fa-leaf text-2xl text-atl-gold\'></i></div>';">
+                </div>
+                <div class="p-2.5">
+                    <p class="text-xs font-semibold text-white">Sustainability</p>
+                    <p class="text-[10px] text-gray-500">100% Clean Energy</p>
+                </div>
+            </a>
+        </div>
+
         <!-- ─── GIS / ENVIRONMENTAL ROW ─── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Environmental Monitoring -->
@@ -577,9 +630,12 @@
     </main>
 
     <!-- Footer -->
-    <footer class="px-4 sm:px-6 py-3 border-t border-atl-border text-center text-[11px] text-gray-500">
-        City of Atlanta &bull; 55 Trinity Ave SW, Atlanta, GA 30303 &bull;
-        Powered by <span class="text-atl-gold font-medium">ARIC Software &amp; Design</span> &bull; &copy; 2026
+    <footer class="px-4 sm:px-6 py-4 border-t border-atl-border">
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 text-[11px] text-gray-500">
+            <img src="https://www.atlantaga.gov/home/showpublishedimage/19579/638237457477530000" alt="City of Atlanta" class="h-8 w-8 rounded-full object-cover opacity-60" onerror="this.style.display='none';">
+            <span>City of Atlanta &bull; 55 Trinity Ave SW, Atlanta, GA 30303 &bull;
+            Powered by <span class="text-atl-gold font-medium">ARIC Software &amp; Design</span> &bull; &copy; 2026</span>
+        </div>
     </footer>
 </div>
 
