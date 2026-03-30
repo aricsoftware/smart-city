@@ -145,21 +145,6 @@
           }
         }
       }, true);
-      // DevTools size-detection: clears content if devtools panel is open
-      var _dt = { open: false };
-      var _threshold = 160;
-      setInterval(function(){
-        var widthDiff  = window.outerWidth  - window.innerWidth  > _threshold;
-        var heightDiff = window.outerHeight - window.innerHeight > _threshold;
-        if (widthDiff || heightDiff) {
-          if (!_dt.open) {
-            _dt.open = true;
-            document.body.innerHTML = '';
-          }
-        } else {
-          _dt.open = false;
-        }
-      }, 500);
     })();
     </script>
 </head>
