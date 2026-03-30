@@ -126,6 +126,42 @@
             font-weight: 600; font-size: 11px;
         }
     </style>
+    <script>
+    // ── Source protection (deterrent-level) ──
+    (function(){
+      // Disable right-click context menu
+      document.addEventListener('contextmenu', function(e){ e.preventDefault(); }, true);
+      // Block common view-source / devtools shortcuts
+      document.addEventListener('keydown', function(e){
+        var k = e.key || '';
+        // F12
+        if (k === 'F12') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+        // Ctrl/Cmd combos: U (view-source), S (save), Shift+I, Shift+J, Shift+C
+        if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+          if (k === 'u' || k === 'U') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+          if (k === 's' || k === 'S') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+          if (e.shiftKey && (k === 'I' || k === 'i' || k === 'J' || k === 'j' || k === 'C' || k === 'c')) {
+            e.preventDefault(); e.stopImmediatePropagation(); return;
+          }
+        }
+      }, true);
+      // DevTools size-detection: clears content if devtools panel is open
+      var _dt = { open: false };
+      var _threshold = 160;
+      setInterval(function(){
+        var widthDiff  = window.outerWidth  - window.innerWidth  > _threshold;
+        var heightDiff = window.outerHeight - window.innerHeight > _threshold;
+        if (widthDiff || heightDiff) {
+          if (!_dt.open) {
+            _dt.open = true;
+            document.body.innerHTML = '';
+          }
+        } else {
+          _dt.open = false;
+        }
+      }, 500);
+    })();
+    </script>
 </head>
 
 <body class="bg-atl-dark font-sans text-gray-200 min-h-screen overflow-x-hidden">
