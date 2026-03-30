@@ -1982,16 +1982,48 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 
     }
 
-    // ── Atlanta Public Schools Bus Livery ──
-    function applyBusLivery(model) {
-        // Chrome yellow body for all non-wheel, non-glass meshes
-        var bodyMat = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.10, roughness: 0.55 });
+    // ── Atlanta Public Schools Bus Livery (PBR + Clearcoat) ──
+    // CC0 PBR surface maps: AmbientCG PaintedMetal012 (ambientcg.com, CC0)
+    var _busTexCache = null;
+    function loadBusTextures(callback) {
+        if (_busTexCache) { callback(_busTexCache); return; }
+        var tl = new THREE.TextureLoader();
+        var cache = {};
+        var remaining = 2;
+        function tick() { if (--remaining === 0) { _busTexCache = cache; callback(cache); } }
+        function loadMap(key, url) {
+            tl.load(url, function(t) {
+                t.wrapS = t.wrapT = THREE.RepeatWrapping;
+                t.repeat.set(2, 1);
+                cache[key] = t;
+                tick();
+            }, undefined, function() { tick(); }); // graceful fallback on error
+        }
+        loadMap('normal',    'models/bus-normal.jpg');
+        loadMap('roughness', 'models/bus-roughness.jpg');
+    }
+
+    function applyBusLivery(model, textures) {
+        textures = textures || {};
+        // MeshPhysicalMaterial: clearcoat simulates the gloss lacquer on vehicle paint
         model.traverse(function(child) {
             if (!child.isMesh) return;
             var n = (child.name || '').toLowerCase();
             if (n.includes('wheel') || n.includes('tire') || n.includes('tyre') || n.includes('rim')) return;
             if (n.includes('glass') || n.includes('window') || n.includes('windshield')) return;
-            child.material = bodyMat.clone();
+            var mat = new THREE.MeshPhysicalMaterial({
+                color: 0xFFD700,
+                metalness: 0.05,
+                roughness: 0.38,
+                clearcoat: 0.85,
+                clearcoatRoughness: 0.12
+            });
+            if (textures.normal) {
+                mat.normalMap = textures.normal;
+                mat.normalScale.set(0.55, 0.55);
+            }
+            if (textures.roughness) { mat.roughnessMap = textures.roughness; }
+            child.material = mat;
         });
 
         // ── Build APS side-panel livery canvas (512×128) ──
@@ -2115,10 +2147,19 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         if (glbPath) {
             glbLoader.load(glbPath, function(gltf) {
                 var model = addGLTFModel(gltf, type === 'traffic' ? 4 : 3);
-                if (type === 'police') applyAPDLivery(model);
-                if (type === 'bus')    applyBusLivery(model);
-                dtScene.add(model);
                 console.log('[DT] GLTF model loaded:', type);
+                if (type === 'police') {
+                    applyAPDLivery(model);
+                    dtScene.add(model);
+                } else if (type === 'bus') {
+                    // Load PBR textures first, then apply livery and add to scene
+                    loadBusTextures(function(textures) {
+                        applyBusLivery(model, textures);
+                        dtScene.add(model);
+                    });
+                } else {
+                    dtScene.add(model);
+                }
             }, undefined, function(err) {
                 console.warn('[DT] GLTF load failed, using procedural fallback:', err);
                 var model;
