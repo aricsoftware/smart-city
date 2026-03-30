@@ -19,7 +19,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
 
     <!-- Three.js (WebGL) — Digital Twin viewer -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -1897,26 +1898,47 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         return g;
     }
 
+    // ── GLTF model file mapping ──
+    var glbFiles = { police: 'models/police-car.glb', ambulance: 'models/ambulance.glb', bus: 'models/school-bus.glb', traffic: 'models/traffic-light.glb' };
+    var glbLoader = new THREE.GLTFLoader();
+
+    function addGLTFModel(gltf, targetSize) {
+        var model = gltf.scene;
+        // Enable shadows on all meshes
+        model.traverse(function(child) { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+        // Auto-center and scale to fit
+        var box = new THREE.Box3().setFromObject(model);
+        var center = box.getCenter(new THREE.Vector3());
+        var size = box.getSize(new THREE.Vector3());
+        var maxDim = Math.max(size.x, size.y, size.z);
+        var scale = (targetSize || 3) / maxDim;
+        model.scale.setScalar(scale);
+        // Re-center after scale
+        box.setFromObject(model);
+        center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center);
+        model.position.y += box.getSize(new THREE.Vector3()).y / 2;
+        return model;
+    }
+
     // ── Open / Close ──
     function openDigitalTwin(type, label, extra) {
         console.log('[DT] openDigitalTwin called:', type, label);
-        // Show section first so canvas has real dimensions
         dtSection.classList.add('active');
-        // Force reflow so clientWidth/Height are available
         void dtSection.offsetHeight;
-        console.log('[DT] canvas dims after reflow:', dtCanvas.clientWidth, dtCanvas.clientHeight);
-        if (!dtScene) { console.log('[DT] initializing Twin...'); initTwin(); }
+        if (!dtScene) { initTwin(); }
         clearScene();
-        console.log('[DT] scene cleared, building model:', type);
-        var model, badgeColor, badgeText, statusText;
+
+        var badgeColor, badgeText, statusText;
         switch (type) {
-            case 'police':    model = buildPoliceCar();              badgeColor='#2563EB'; badgeText='APD';        statusText='Patrolling'; break;
-            case 'ambulance': model = buildAmbulance();              badgeColor='#DC2626'; badgeText='EMS';        statusText='En Route';   break;
-            case 'bus':       model = buildSchoolBus();              badgeColor='#D97706'; badgeText='SCHOOL BUS'; statusText='Active Route'; break;
-            case 'traffic':   model = buildTrafficLight(extra||'red'); badgeColor='#10B981'; badgeText='SIGNAL';    statusText=(extra||'red').toUpperCase(); break;
+            case 'police':    badgeColor='#2563EB'; badgeText='APD';        statusText='Patrolling'; break;
+            case 'ambulance': badgeColor='#DC2626'; badgeText='EMS';        statusText='En Route';   break;
+            case 'bus':       badgeColor='#D97706'; badgeText='SCHOOL BUS'; statusText='Active Route'; break;
+            case 'traffic':   badgeColor='#10B981'; badgeText='SIGNAL';     statusText=(extra||'red').toUpperCase(); break;
             default: return;
         }
-        dtScene.add(model);
+
+        // Update UI immediately
         orbit.theta = 0.8; orbit.phi = 0.6; orbit.radius = 7; orbit.autoRotate = true;
         dtTitle.textContent = '\uD83D\uDD0D Digital Twin \u2014 ' + label;
         dtInfo.innerHTML =
@@ -1924,10 +1946,29 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
             '<span><i class="fa-solid fa-circle" style="font-size:7px;color:'+badgeColor+'"></i> '+statusText+'</span>'+
             '<span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate \u00b7 Scroll to zoom</span>';
         resizeTwin();
-        console.log('[DT] model added, starting animation. Renderer size:', dtRenderer.getSize(new THREE.Vector2()));
         dtSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
         animateTwin();
         requestAnimationFrame(function() { resizeTwin(); });
+
+        // Load GLTF model, fallback to procedural
+        var glbPath = glbFiles[type];
+        if (glbPath) {
+            glbLoader.load(glbPath, function(gltf) {
+                var model = addGLTFModel(gltf, type === 'traffic' ? 4 : 3);
+                dtScene.add(model);
+                console.log('[DT] GLTF model loaded:', type);
+            }, undefined, function(err) {
+                console.warn('[DT] GLTF load failed, using procedural fallback:', err);
+                var model;
+                switch (type) {
+                    case 'police':    model = buildPoliceCar(); break;
+                    case 'ambulance': model = buildAmbulance(); break;
+                    case 'bus':       model = buildSchoolBus(); break;
+                    case 'traffic':   model = buildTrafficLight(extra||'red'); break;
+                }
+                if (model) dtScene.add(model);
+            });
+        }
     }
 
     function closeDigitalTwin() {
