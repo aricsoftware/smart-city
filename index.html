@@ -61,6 +61,8 @@
         .leaflet-control-zoom a { background: #1F2937 !important; color: #E5E7EB !important; border-color: #374151 !important; }
         .leaflet-control-layers { background: #1F2937 !important; color: #E5E7EB !important; border-color: #374151 !important; }
         .leaflet-control-layers-separator { border-color: #374151 !important; }
+        .city-boundary-tooltip { background: #1F2937 !important; color: #93C5FD !important; border: 1px solid #3B82F6 !important; font-size: 11px; padding: 3px 8px; border-radius: 4px; }
+        .city-boundary-tooltip::before { border-top-color: #3B82F6 !important; }
 
         /* Pulse animation */
         @keyframes pulse-ring {
@@ -757,6 +759,29 @@ map.on('mousemove', function(e) {
 L.control.attribution({ prefix: false, position: 'bottomright' })
     .addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors')
     .addTo(map);
+
+// ── Atlanta City Limits Boundary ──
+fetch('models/atlanta-boundary.geojson')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        L.geoJSON(data, {
+            style: {
+                color: '#3B82F6',
+                weight: 2.5,
+                opacity: 0.7,
+                fillColor: '#3B82F6',
+                fillOpacity: 0.04,
+                dashArray: '8, 6'
+            },
+            onEachFeature: function(feature, layer) {
+                layer.bindTooltip('City of Atlanta', {
+                    sticky: true,
+                    className: 'city-boundary-tooltip',
+                    opacity: 0.85
+                });
+            }
+        }).addTo(map);
+    });
 
 // ══════════════════════════════════════════
 // VEHICLE ICONS
