@@ -18,9 +18,15 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
 
-    <!-- Three.js (WebGL) + OrbitControls — Digital Twin viewer -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/controls/OrbitControls.js" type="module"></script>
+    <!-- Three.js (WebGL) — Digital Twin viewer -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+        }
+    }
+    </script>
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -1293,7 +1299,8 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 // ══════════════════════════════════════════
 // DIGITAL TWIN — Three.js WebGL Viewer
 // ══════════════════════════════════════════
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const dtOverlay = document.getElementById('dt-overlay');
 const dtCanvas  = document.getElementById('dt-canvas');
