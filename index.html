@@ -19,14 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
 
     <!-- Three.js (WebGL) — Digital Twin viewer -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
-        }
-    }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.min.js"></script>
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -1295,378 +1288,250 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
     </div>
 </div>
 
-<script type="module">
-// ══════════════════════════════════════════
-// DIGITAL TWIN — Three.js WebGL Viewer
-// ══════════════════════════════════════════
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-const dtOverlay = document.getElementById('dt-overlay');
-const dtCanvas  = document.getElementById('dt-canvas');
-const dtTitle   = document.getElementById('dt-title');
-const dtInfo    = document.getElementById('dt-info');
-const dtClose   = document.getElementById('dt-close');
-
-let dtScene, dtCamera, dtRenderer, dtControls, dtAnimId;
-
-function initTwin() {
-    dtScene = new THREE.Scene();
-
-    // Renderer
-    dtRenderer = new THREE.WebGLRenderer({ canvas: dtCanvas, antialias: true, alpha: true });
-    dtRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    dtRenderer.setClearColor(0x0B0F19, 1);
-    resizeTwin();
-
-    // Camera
-    dtCamera = new THREE.PerspectiveCamera(40, dtCanvas.clientWidth / dtCanvas.clientHeight, 0.1, 100);
-    dtCamera.position.set(4, 3, 5);
-
-    // OrbitControls — rotate, zoom, pan
-    dtControls = new OrbitControls(dtCamera, dtCanvas);
-    dtControls.enableDamping = true;
-    dtControls.dampingFactor = 0.08;
-    dtControls.minDistance = 2;
-    dtControls.maxDistance = 15;
-    dtControls.target.set(0, 0.5, 0);
-
-    // Lights
-    dtScene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-    dir.position.set(5, 8, 5);
-    dtScene.add(dir);
-    const rim = new THREE.DirectionalLight(0x4488ff, 0.4);
-    rim.position.set(-3, 2, -4);
-    dtScene.add(rim);
-
-    // Ground grid
-    const grid = new THREE.GridHelper(10, 20, 0x374151, 0x1F2937);
-    dtScene.add(grid);
-}
-
-function resizeTwin() {
-    if (!dtRenderer) return;
-    const w = dtCanvas.clientWidth, h = dtCanvas.clientHeight;
-    dtRenderer.setSize(w, h, false);
-    if (dtCamera) { dtCamera.aspect = w / h; dtCamera.updateProjectionMatrix(); }
-}
-
-function animateTwin() {
-    dtAnimId = requestAnimationFrame(animateTwin);
-    dtControls.update();
-    dtRenderer.render(dtScene, dtCamera);
-}
-
-function clearScene() {
-    cancelAnimationFrame(dtAnimId);
-    // Remove everything except grid and lights
-    const keep = [];
-    dtScene.traverse(o => {
-        if (o.isLight || o.isGridHelper) keep.push(o);
-    });
-    while (dtScene.children.length) dtScene.remove(dtScene.children[0]);
-    keep.forEach(o => dtScene.add(o));
-    // Re-add grid
-    dtScene.add(new THREE.GridHelper(10, 20, 0x374151, 0x1F2937));
-}
-
-// ── Materials ──
-function mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.2 }); }
-function glassMat() { return new THREE.MeshStandardMaterial({ color: 0x88ccff, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.5 }); }
-
-// ── Build: Police Car ──
-function buildPoliceCar() {
-    const g = new THREE.Group();
-    // Body
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 1.0), mat(0x1e40af));
-    body.position.y = 0.5;
-    g.add(body);
-    // Cabin
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 0.9), glassMat());
-    cabin.position.set(-0.1, 1.05, 0);
-    g.add(cabin);
-    // Roof
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.95), mat(0x111827));
-    roof.position.set(-0.1, 1.34, 0);
-    g.add(roof);
-    // Light bar
-    const barBase = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.3), mat(0x333333));
-    barBase.position.set(0, 1.44, 0);
-    g.add(barBase);
-    const redLight = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.5 }));
-    redLight.position.set(0.2, 1.52, 0);
-    g.add(redLight);
-    const blueLight = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), new THREE.MeshStandardMaterial({ color: 0x0055ff, emissive: 0x0055ff, emissiveIntensity: 1.5 }));
-    blueLight.position.set(-0.2, 1.52, 0);
-    g.add(blueLight);
-    // Wheels
-    const wheelGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.12, 16);
-    const wheelMat = mat(0x222222);
-    [[-0.65, 0.2, 0.52], [-0.65, 0.2, -0.52], [0.65, 0.2, 0.52], [0.65, 0.2, -0.52]].forEach(p => {
-        const w = new THREE.Mesh(wheelGeo, wheelMat);
-        w.rotation.x = Math.PI / 2;
-        w.position.set(...p);
-        g.add(w);
-    });
-    // Bumpers
-    const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.9), mat(0x888888));
-    bumper.position.set(1.15, 0.35, 0);
-    g.add(bumper.clone());
-    bumper.position.set(-1.15, 0.35, 0);
-    g.add(bumper);
-    // "POLICE" text decal — front hood stripe
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.22, 0.04, 0.15), mat(0xffffff));
-    stripe.position.set(0, 0.82, 0);
-    g.add(stripe);
-    return g;
-}
-
-// ── Build: Ambulance ──
-function buildAmbulance() {
-    const g = new THREE.Group();
-    // Cab
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 1.0), mat(0xfafafa));
-    cab.position.set(0.95, 0.55, 0);
-    g.add(cab);
-    // Cab windshield
-    const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.85), glassMat());
-    windshield.position.set(1.42, 0.7, 0);
-    g.add(windshield);
-    // Box body
-    const box = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.0, 1.1), mat(0xfafafa));
-    box.position.set(-0.3, 0.7, 0);
-    g.add(box);
-    // Red stripe
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.15, 1.12), mat(0xdc2626));
-    stripe.position.set(-0.3, 0.55, 0);
-    g.add(stripe);
-    // Red cross
-    const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.25, 0.08), mat(0xdc2626));
-    crossH.position.set(-1.12, 0.85, 0);
-    g.add(crossH);
-    const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.25), mat(0xdc2626));
-    crossV.position.set(-1.12, 0.85, 0);
-    g.add(crossV);
-    // Roof lights
-    const roofLight1 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.2 }));
-    roofLight1.position.set(0.95, 0.98, 0.3);
-    g.add(roofLight1);
-    const roofLight2 = roofLight1.clone();
-    roofLight2.position.set(0.95, 0.98, -0.3);
-    g.add(roofLight2);
-    // Wheels
-    const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 16);
-    const wheelMt = mat(0x222222);
-    [[0.7, 0.22, 0.55], [0.7, 0.22, -0.55], [-0.6, 0.22, 0.55], [-0.6, 0.22, -0.55]].forEach(p => {
-        const w = new THREE.Mesh(wheelGeo, wheelMt);
-        w.rotation.x = Math.PI / 2;
-        w.position.set(...p);
-        g.add(w);
-    });
-    return g;
-}
-
-// ── Build: School Bus ──
-function buildSchoolBus() {
-    const g = new THREE.Group();
-    // Main body
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.9, 1.0), mat(0xd97706));
-    body.position.y = 0.65;
-    g.add(body);
-    // Roof
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(2.82, 0.06, 1.02), mat(0xb45309));
-    roof.position.y = 1.13;
-    g.add(roof);
-    // Black stripe (bumper line)
-    const bStripe = new THREE.Mesh(new THREE.BoxGeometry(2.82, 0.1, 1.02), mat(0x1a1a1a));
-    bStripe.position.y = 0.25;
-    g.add(bStripe);
-    // Windows
-    for (let i = -3; i <= 3; i++) {
-        const win = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.04), glassMat());
-        win.position.set(i * 0.35, 0.82, 0.52);
-        g.add(win);
-        const win2 = win.clone();
-        win2.position.z = -0.52;
-        g.add(win2);
-    }
-    // Windshield
-    const ws = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 0.85), glassMat());
-    ws.position.set(1.42, 0.8, 0);
-    g.add(ws);
-    // Stop sign arm (left side — folded)
-    const stopArm = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.25), mat(0xef4444));
-    stopArm.position.set(0.6, 0.85, 0.57);
-    g.add(stopArm);
-    // Wheels
-    const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 16);
-    const wheelMt = mat(0x222222);
-    [[-0.9, 0.22, 0.55], [-0.9, 0.22, -0.55], [0.9, 0.22, 0.55], [0.9, 0.22, -0.55]].forEach(p => {
-        const w = new THREE.Mesh(wheelGeo, wheelMt);
-        w.rotation.x = Math.PI / 2;
-        w.position.set(...p);
-        g.add(w);
-    });
-    // Headlights
-    const hl = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 0.5 }));
-    hl.position.set(1.42, 0.5, 0.3);
-    g.add(hl);
-    const hl2 = hl.clone();
-    hl2.position.z = -0.3;
-    g.add(hl2);
-    return g;
-}
-
-// ── Build: Traffic Light ──
-function buildTrafficLight(activeColor) {
-    const g = new THREE.Group();
-    // Pole
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.8, 12), mat(0x555555));
-    pole.position.y = 1.4;
-    g.add(pole);
-    // Base plate
-    const basePlate = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.08, 16), mat(0x444444));
-    basePlate.position.y = 0.04;
-    g.add(basePlate);
-    // Housing
-    const housing = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.0, 0.3), mat(0x222222));
-    housing.position.y = 3.1;
-    g.add(housing);
-    // Visor top
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.35), mat(0x222222));
-    visor.position.y = 3.62;
-    g.add(visor);
-    // Lights
-    const colors = [
-        { c: 0xef4444, name: 'red',    y: 3.4 },
-        { c: 0xfbbf24, name: 'yellow', y: 3.1 },
-        { c: 0x10b981, name: 'green',  y: 2.8 }
-    ];
-    colors.forEach(l => {
-        const isActive = l.name === activeColor;
-        const m = new THREE.MeshStandardMaterial({
-            color: isActive ? l.c : 0x333333,
-            emissive: isActive ? l.c : 0x000000,
-            emissiveIntensity: isActive ? 1.5 : 0,
-            roughness: 0.3
-        });
-        const light = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), m);
-        light.position.set(0, l.y, 0.16);
-        g.add(light);
-    });
-    // Scale down to fit viewer
-    g.scale.set(0.7, 0.7, 0.7);
-    g.position.y = -0.5;
-    return g;
-}
-
-// ── Open / Close Modal ──
-function openDigitalTwin(type, label, extra) {
-    if (!dtScene) initTwin();
-    clearScene();
-
-    let model;
-    let badgeColor, badgeText, statusText;
-
-    switch (type) {
-        case 'police':
-            model = buildPoliceCar();
-            badgeColor = '#2563EB'; badgeText = 'APD'; statusText = 'Patrolling';
-            break;
-        case 'ambulance':
-            model = buildAmbulance();
-            badgeColor = '#DC2626'; badgeText = 'EMS'; statusText = 'En Route';
-            break;
-        case 'bus':
-            model = buildSchoolBus();
-            badgeColor = '#D97706'; badgeText = 'SCHOOL BUS'; statusText = 'Active Route';
-            break;
-        case 'traffic':
-            model = buildTrafficLight(extra || 'red');
-            badgeColor = '#10B981'; badgeText = 'SIGNAL'; statusText = (extra || 'red').toUpperCase();
-            break;
-        default:
-            return;
-    }
-
-    dtScene.add(model);
-
-    // Slow auto-rotate
-    dtControls.autoRotate = true;
-    dtControls.autoRotateSpeed = 2.0;
-
-    dtTitle.textContent = '🔍 Digital Twin — ' + label;
-    dtInfo.innerHTML = `
-        <span><span class="dt-badge" style="background:${badgeColor}22;color:${badgeColor};border:1px solid ${badgeColor}44;">${badgeText}</span></span>
-        <span><i class="fa-solid fa-circle" style="font-size:7px;color:${badgeColor}"></i> ${statusText}</span>
-        <span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate · Scroll to zoom</span>
-    `;
-
-    resizeTwin();
-    dtOverlay.classList.add('active');
-    animateTwin();
-}
-
-function closeDigitalTwin() {
-    dtOverlay.classList.remove('active');
-    cancelAnimationFrame(dtAnimId);
-    if (dtControls) dtControls.autoRotate = false;
-}
-
-dtClose.addEventListener('click', closeDigitalTwin);
-dtOverlay.addEventListener('click', e => { if (e.target === dtOverlay) closeDigitalTwin(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDigitalTwin(); });
-
-// Resize handler
-window.addEventListener('resize', resizeTwin);
-
-// ── Expose for map marker click handlers ──
-window.openDigitalTwin = openDigitalTwin;
-</script>
-
 <script>
 // ══════════════════════════════════════════
-// WIRE VEHICLE & TRAFFIC LIGHT CLICK → DIGITAL TWIN
+// DIGITAL TWIN — Three.js WebGL Viewer
+// (no ES modules — uses global THREE)
 // ══════════════════════════════════════════
+(function() {
+    'use strict';
 
-// Vehicle markers — click opens 3D twin viewer
-Object.keys(vehicleRoutes).forEach(id => {
-    const v = vehicleRoutes[id];
-    vehicles[id].marker.on('click', function(e) {
-        L.DomEvent.stopPropagation(e);
-        window.openDigitalTwin(v.type, v.label);
-    });
-    // Update popup to include "View Digital Twin" link
-    vehicles[id].marker.unbindPopup();
-    vehicles[id].marker.bindPopup(`
-        <strong>${v.label}</strong><br>
-        Status: Patrolling<br>
-        Speed: ${(15 + Math.random() * 20).toFixed(0)} mph<br>
-        <a href="#" onclick="event.preventDefault();window.openDigitalTwin('${v.type}','${v.label.replace(/'/g, "\\'")}')"
-           style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;">
-           🔍 View Digital Twin
-        </a>
-    `);
-});
+    var dtOverlay = document.getElementById('dt-overlay');
+    var dtCanvas  = document.getElementById('dt-canvas');
+    var dtTitle   = document.getElementById('dt-title');
+    var dtInfo    = document.getElementById('dt-info');
+    var dtClose   = document.getElementById('dt-close');
 
-// Traffic light markers — click opens 3D twin viewer
-trafficLights.forEach(tl => {
-    tl.marker.on('click', function(e) {
-        L.DomEvent.stopPropagation(e);
-        window.openDigitalTwin('traffic', '🚦 ' + tl.name, tl.color);
+    var dtScene, dtCamera, dtRenderer, dtAnimId;
+
+    // ── Simple Orbit Controller (replaces OrbitControls) ──
+    var orbit = { theta: 0.8, phi: 0.6, radius: 7, target: {x:0,y:0.5,z:0}, autoRotate: false, dragging: false, lastX: 0, lastY: 0 };
+
+    function updateCameraFromOrbit() {
+        var sp = Math.sin(orbit.phi);
+        dtCamera.position.set(
+            orbit.target.x + orbit.radius * sp * Math.sin(orbit.theta),
+            orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+            orbit.target.z + orbit.radius * sp * Math.cos(orbit.theta)
+        );
+        dtCamera.lookAt(orbit.target.x, orbit.target.y, orbit.target.z);
+    }
+
+    function onPointerDown(e) { orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY; orbit.autoRotate = false; }
+    function onPointerUp()    { orbit.dragging = false; }
+    function onPointerMove(e) {
+        if (!orbit.dragging) return;
+        var dx = e.clientX - orbit.lastX, dy = e.clientY - orbit.lastY;
+        orbit.theta -= dx * 0.008;
+        orbit.phi = Math.max(0.15, Math.min(Math.PI - 0.15, orbit.phi + dy * 0.008));
+        orbit.lastX = e.clientX; orbit.lastY = e.clientY;
+    }
+    function onWheel(e) {
+        e.preventDefault();
+        orbit.radius = Math.max(2, Math.min(15, orbit.radius + e.deltaY * 0.01));
+    }
+    // Touch support
+    function onTouchStart(e) { if (e.touches.length === 1) { orbit.dragging = true; orbit.lastX = e.touches[0].clientX; orbit.lastY = e.touches[0].clientY; orbit.autoRotate = false; } }
+    function onTouchEnd()    { orbit.dragging = false; }
+    function onTouchMove(e)  { if (!orbit.dragging || e.touches.length !== 1) return; e.preventDefault(); var dx = e.touches[0].clientX - orbit.lastX, dy = e.touches[0].clientY - orbit.lastY; orbit.theta -= dx * 0.008; orbit.phi = Math.max(0.15, Math.min(Math.PI - 0.15, orbit.phi + dy * 0.008)); orbit.lastX = e.touches[0].clientX; orbit.lastY = e.touches[0].clientY; }
+
+    dtCanvas.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointermove', onPointerMove);
+    dtCanvas.addEventListener('wheel', onWheel, { passive: false });
+    dtCanvas.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+    dtCanvas.addEventListener('touchmove', onTouchMove, { passive: false });
+
+    function initTwin() {
+        dtScene = new THREE.Scene();
+        dtRenderer = new THREE.WebGLRenderer({ canvas: dtCanvas, antialias: true, alpha: true });
+        dtRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        dtRenderer.setClearColor(0x0B0F19, 1);
+        resizeTwin();
+
+        dtCamera = new THREE.PerspectiveCamera(40, dtCanvas.clientWidth / dtCanvas.clientHeight, 0.1, 100);
+        updateCameraFromOrbit();
+
+        dtScene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        var dir = new THREE.DirectionalLight(0xffffff, 1.0);
+        dir.position.set(5, 8, 5); dtScene.add(dir);
+        var rim = new THREE.DirectionalLight(0x4488ff, 0.4);
+        rim.position.set(-3, 2, -4); dtScene.add(rim);
+        dtScene.add(new THREE.GridHelper(10, 20, 0x374151, 0x1F2937));
+    }
+
+    function resizeTwin() {
+        if (!dtRenderer) return;
+        var w = dtCanvas.clientWidth, h = dtCanvas.clientHeight;
+        dtRenderer.setSize(w, h, false);
+        if (dtCamera) { dtCamera.aspect = w / h; dtCamera.updateProjectionMatrix(); }
+    }
+
+    function animateTwin() {
+        dtAnimId = requestAnimationFrame(animateTwin);
+        if (orbit.autoRotate) orbit.theta += 0.005;
+        updateCameraFromOrbit();
+        dtRenderer.render(dtScene, dtCamera);
+    }
+
+    function clearScene() {
+        cancelAnimationFrame(dtAnimId);
+        var keep = [];
+        dtScene.traverse(function(o) { if (o.isLight || o.isGridHelper) keep.push(o); });
+        while (dtScene.children.length) dtScene.remove(dtScene.children[0]);
+        keep.forEach(function(o) { dtScene.add(o); });
+        dtScene.add(new THREE.GridHelper(10, 20, 0x374151, 0x1F2937));
+    }
+
+    // ── Materials ──
+    function mat(color) { return new THREE.MeshStandardMaterial({ color: color, roughness: 0.4, metalness: 0.2 }); }
+    function glassMat() { return new THREE.MeshStandardMaterial({ color: 0x88ccff, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.5 }); }
+    function emitMat(color, intensity) { return new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: intensity || 1.5 }); }
+
+    // ── Build: Police Car ──
+    function buildPoliceCar() {
+        var g = new THREE.Group();
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.2,0.6,1.0), mat(0x1e40af)), {position: new THREE.Vector3(0,0.5,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.1,0.5,0.9), glassMat()), {position: new THREE.Vector3(-0.1,1.05,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.2,0.08,0.95), mat(0x111827)), {position: new THREE.Vector3(-0.1,1.34,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.1,0.3), mat(0x333333)), {position: new THREE.Vector3(0,1.44,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.08,12,12), emitMat(0xff0000)), {position: new THREE.Vector3(0.2,1.52,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.08,12,12), emitMat(0x0055ff)), {position: new THREE.Vector3(-0.2,1.52,0)}));
+        var wg = new THREE.CylinderGeometry(0.2,0.2,0.12,16), wm = mat(0x222222);
+        [[-0.65,0.2,0.52],[-0.65,0.2,-0.52],[0.65,0.2,0.52],[0.65,0.2,-0.52]].forEach(function(p){
+            var w = new THREE.Mesh(wg, wm); w.rotation.x = Math.PI/2; w.position.set(p[0],p[1],p[2]); g.add(w);
+        });
+        var bmp = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.2,0.9), mat(0x888888));
+        bmp.position.set(1.15,0.35,0); g.add(bmp.clone()); bmp.position.set(-1.15,0.35,0); g.add(bmp);
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.22,0.04,0.15), mat(0xffffff)), {position: new THREE.Vector3(0,0.82,0)}));
+        return g;
+    }
+
+    // ── Build: Ambulance ──
+    function buildAmbulance() {
+        var g = new THREE.Group();
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.9,0.7,1.0), mat(0xfafafa)), {position: new THREE.Vector3(0.95,0.55,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.05,0.4,0.85), glassMat()), {position: new THREE.Vector3(1.42,0.7,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.6,1.0,1.1), mat(0xfafafa)), {position: new THREE.Vector3(-0.3,0.7,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.62,0.15,1.12), mat(0xdc2626)), {position: new THREE.Vector3(-0.3,0.55,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.04,0.25,0.08), mat(0xdc2626)), {position: new THREE.Vector3(-1.12,0.85,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.25), mat(0xdc2626)), {position: new THREE.Vector3(-1.12,0.85,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.08,12,12), emitMat(0xff0000,1.2)), {position: new THREE.Vector3(0.95,0.98,0.3)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.08,12,12), emitMat(0xff0000,1.2)), {position: new THREE.Vector3(0.95,0.98,-0.3)}));
+        var wg = new THREE.CylinderGeometry(0.22,0.22,0.12,16), wm = mat(0x222222);
+        [[0.7,0.22,0.55],[0.7,0.22,-0.55],[-0.6,0.22,0.55],[-0.6,0.22,-0.55]].forEach(function(p){
+            var w = new THREE.Mesh(wg, wm); w.rotation.x = Math.PI/2; w.position.set(p[0],p[1],p[2]); g.add(w);
+        });
+        return g;
+    }
+
+    // ── Build: School Bus ──
+    function buildSchoolBus() {
+        var g = new THREE.Group();
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8,0.9,1.0), mat(0xd97706)), {position: new THREE.Vector3(0,0.65,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.82,0.06,1.02), mat(0xb45309)), {position: new THREE.Vector3(0,1.13,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.82,0.1,1.02), mat(0x1a1a1a)), {position: new THREE.Vector3(0,0.25,0)}));
+        for (var i = -3; i <= 3; i++) {
+            var win = new THREE.Mesh(new THREE.BoxGeometry(0.25,0.3,0.04), glassMat()); win.position.set(i*0.35,0.82,0.52); g.add(win);
+            var w2 = win.clone(); w2.position.z = -0.52; g.add(w2);
+        }
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.04,0.5,0.85), glassMat()), {position: new THREE.Vector3(1.42,0.8,0)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02,0.3,0.25), mat(0xef4444)), {position: new THREE.Vector3(0.6,0.85,0.57)}));
+        var wg = new THREE.CylinderGeometry(0.22,0.22,0.12,16), wm = mat(0x222222);
+        [[-0.9,0.22,0.55],[-0.9,0.22,-0.55],[0.9,0.22,0.55],[0.9,0.22,-0.55]].forEach(function(p){
+            var w = new THREE.Mesh(wg, wm); w.rotation.x = Math.PI/2; w.position.set(p[0],p[1],p[2]); g.add(w);
+        });
+        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), emitMat(0xffffaa,0.5)), {position: new THREE.Vector3(1.42,0.5,0.3)}));
+        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), emitMat(0xffffaa,0.5)), {position: new THREE.Vector3(1.42,0.5,-0.3)}));
+        return g;
+    }
+
+    // ── Build: Traffic Light ──
+    function buildTrafficLight(activeColor) {
+        var g = new THREE.Group();
+        var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,2.8,12), mat(0x555555)); pole.position.y=1.4; g.add(pole);
+        var bp = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.35,0.08,16), mat(0x444444)); bp.position.y=0.04; g.add(bp);
+        var housing = new THREE.Mesh(new THREE.BoxGeometry(0.4,1.0,0.3), mat(0x222222)); housing.position.y=3.1; g.add(housing);
+        var visor = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.06,0.35), mat(0x222222)); visor.position.y=3.62; g.add(visor);
+        [{c:0xef4444,name:'red',y:3.4},{c:0xfbbf24,name:'yellow',y:3.1},{c:0x10b981,name:'green',y:2.8}].forEach(function(l){
+            var on = l.name === activeColor;
+            var m = new THREE.MeshStandardMaterial({color:on?l.c:0x333333, emissive:on?l.c:0x000000, emissiveIntensity:on?1.5:0, roughness:0.3});
+            var s = new THREE.Mesh(new THREE.SphereGeometry(0.11,16,16), m); s.position.set(0,l.y,0.16); g.add(s);
+        });
+        g.scale.set(0.7,0.7,0.7); g.position.y = -0.5;
+        return g;
+    }
+
+    // ── Open / Close ──
+    function openDigitalTwin(type, label, extra) {
+        if (!dtScene) initTwin();
+        clearScene();
+        var model, badgeColor, badgeText, statusText;
+        switch (type) {
+            case 'police':    model = buildPoliceCar();              badgeColor='#2563EB'; badgeText='APD';        statusText='Patrolling'; break;
+            case 'ambulance': model = buildAmbulance();              badgeColor='#DC2626'; badgeText='EMS';        statusText='En Route';   break;
+            case 'bus':       model = buildSchoolBus();              badgeColor='#D97706'; badgeText='SCHOOL BUS'; statusText='Active Route'; break;
+            case 'traffic':   model = buildTrafficLight(extra||'red'); badgeColor='#10B981'; badgeText='SIGNAL';    statusText=(extra||'red').toUpperCase(); break;
+            default: return;
+        }
+        dtScene.add(model);
+        orbit.theta = 0.8; orbit.phi = 0.6; orbit.radius = 7; orbit.autoRotate = true;
+        dtTitle.textContent = '\uD83D\uDD0D Digital Twin \u2014 ' + label;
+        dtInfo.innerHTML =
+            '<span><span class="dt-badge" style="background:'+badgeColor+'22;color:'+badgeColor+';border:1px solid '+badgeColor+'44;">'+badgeText+'</span></span>'+
+            '<span><i class="fa-solid fa-circle" style="font-size:7px;color:'+badgeColor+'"></i> '+statusText+'</span>'+
+            '<span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate \u00b7 Scroll to zoom</span>';
+        resizeTwin();
+        dtOverlay.classList.add('active');
+        animateTwin();
+    }
+
+    function closeDigitalTwin() {
+        dtOverlay.classList.remove('active');
+        cancelAnimationFrame(dtAnimId);
+        orbit.autoRotate = false;
+    }
+
+    dtClose.addEventListener('click', closeDigitalTwin);
+    dtOverlay.addEventListener('click', function(e) { if (e.target === dtOverlay) closeDigitalTwin(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDigitalTwin(); });
+    window.addEventListener('resize', resizeTwin);
+
+    // Expose globally so map marker handlers can call it
+    window.openDigitalTwin = openDigitalTwin;
+
+    // ── Wire vehicle markers ──
+    Object.keys(vehicleRoutes).forEach(function(id) {
+        var v = vehicleRoutes[id];
+        vehicles[id].marker.on('click', function() {
+            window.openDigitalTwin(v.type, v.label);
+        });
+        vehicles[id].marker.unbindPopup();
+        vehicles[id].marker.bindPopup(
+            '<strong>'+v.label+'</strong><br>'+
+            'Status: Patrolling<br>'+
+            'Speed: '+(15+Math.random()*20).toFixed(0)+' mph<br>'+
+            '<a href="#" onclick="event.preventDefault();window.openDigitalTwin(\''+v.type+'\',\''+v.label.replace(/'/g,"\\'")+'\')"+
+            '" style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;">\uD83D\uDD0D View Digital Twin</a>'
+        );
     });
-    // Update popup to include "View Digital Twin" link
-    tl.marker.unbindPopup();
-    tl.marker.bindPopup(`
-        <strong>🚦 ${tl.name}</strong><br>
-        Status: <span style="color:${tl.color === 'red' ? '#EF4444' : tl.color === 'yellow' ? '#FBBF24' : '#10B981'}">${tl.color.toUpperCase()}</span><br>
-        <a href="#" onclick="event.preventDefault();window.openDigitalTwin('traffic','🚦 ${tl.name.replace(/'/g, "\\'")}')"
-           style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;">
-           🔍 View Digital Twin
-        </a>
-    `);
-});
+
+    // ── Wire traffic light markers ──
+    trafficLights.forEach(function(tl) {
+        tl.marker.on('click', function() {
+            window.openDigitalTwin('traffic', '\uD83D\uDEA6 ' + tl.name, tl.color);
+        });
+        tl.marker.unbindPopup();
+        tl.marker.bindPopup(
+            '<strong>\uD83D\uDEA6 '+tl.name+'</strong><br>'+
+            'Status: <span style="color:'+(tl.color==='red'?'#EF4444':tl.color==='yellow'?'#FBBF24':'#10B981')+'">'+tl.color.toUpperCase()+'</span><br>'+
+            '<a href="#" onclick="event.preventDefault();window.openDigitalTwin(\'traffic\',\'\uD83D\uDEA6 '+tl.name.replace(/'/g,"\\'")+'\')"+
+            '" style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;">\uD83D\uDD0D View Digital Twin</a>'
+        );
+    });
+
+})();
 </script>
 </body>
 </html>
