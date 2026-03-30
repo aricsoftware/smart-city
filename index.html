@@ -129,8 +129,14 @@
             transition: background .2s, color .2s;
         }
         .dt-close:hover { background: #374151; color: #F9FAFB; }
-        #dt-canvas { width: 100%; height: 340px; display: block; cursor: grab; }
+        #dt-canvas { width: 100%; height: 340px; display: block; cursor: grab; touch-action: none; }
         #dt-canvas:active { cursor: grabbing; }
+        @media (max-width: 600px) {
+            .dt-panel { border-radius: 12px; }
+            #dt-canvas { height: 260px; }
+            .dt-close { width: 36px; height: 36px; font-size: 20px; }
+            .dt-info { font-size: 11px; gap: 10px; padding: 10px 14px; }
+        }
         .dt-info {
             padding: 12px 20px; border-top: 1px solid #374151;
             font-size: 12px; color: #9CA3AF;
@@ -1504,30 +1510,31 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
     // ── Wire vehicle markers ──
     Object.keys(vehicleRoutes).forEach(function(id) {
         var v = vehicleRoutes[id];
-        vehicles[id].marker.on('click', function() {
-            window.openDigitalTwin(v.type, v.label);
-        });
+        var safeLabel = v.label.replace(/'/g, "\\'");
+        var speed = (15+Math.random()*20).toFixed(0);
         vehicles[id].marker.unbindPopup();
         vehicles[id].marker.bindPopup(
             '<strong>'+v.label+'</strong><br>'+
             'Status: Patrolling<br>'+
-            'Speed: '+(15+Math.random()*20).toFixed(0)+' mph<br>'+
-            '<a href="#" onclick="event.preventDefault();window.openDigitalTwin(\''+v.type+'\',\''+v.label.replace(/'/g,"\\'")+'\')"+
-            '" style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;">\uD83D\uDD0D View Digital Twin</a>'
+            'Speed: '+speed+' mph<br>'+
+            '<a href="#" onclick="event.preventDefault();event.stopPropagation();window.openDigitalTwin(\''+v.type+"','"+safeLabel+"')\" "+
+            'style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;'+
+            'padding:6px 0;display:inline-block;-webkit-tap-highlight-color:rgba(96,165,250,0.3);touch-action:manipulation;">'+
+            '\uD83D\uDD0D View Digital Twin</a>'
         );
     });
 
     // ── Wire traffic light markers ──
     trafficLights.forEach(function(tl) {
-        tl.marker.on('click', function() {
-            window.openDigitalTwin('traffic', '\uD83D\uDEA6 ' + tl.name, tl.color);
-        });
+        var safeName = tl.name.replace(/'/g, "\\'");
         tl.marker.unbindPopup();
         tl.marker.bindPopup(
             '<strong>\uD83D\uDEA6 '+tl.name+'</strong><br>'+
             'Status: <span style="color:'+(tl.color==='red'?'#EF4444':tl.color==='yellow'?'#FBBF24':'#10B981')+'">'+tl.color.toUpperCase()+'</span><br>'+
-            '<a href="#" onclick="event.preventDefault();window.openDigitalTwin(\'traffic\',\'\uD83D\uDEA6 '+tl.name.replace(/'/g,"\\'")+'\')"+
-            '" style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;">\uD83D\uDD0D View Digital Twin</a>'
+            '<a href="#" onclick="event.preventDefault();event.stopPropagation();window.openDigitalTwin(\'traffic\',\'\uD83D\uDEA6 '+safeName+"')\" "+
+            'style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;'+
+            'padding:6px 0;display:inline-block;-webkit-tap-highlight-color:rgba(96,165,250,0.3);touch-action:manipulation;">'+
+            '\uD83D\uDD0D View Digital Twin</a>'
         );
     });
 
