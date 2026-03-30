@@ -98,19 +98,19 @@
         /* Coordinate display */
         .coord-display { background: rgba(17,24,39,.85); backdrop-filter: blur(6px); padding: 4px 10px; border-radius: 6px; font-size: 11px; color: #9CA3AF; border: 1px solid #374151; font-family: 'Inter', monospace; }
 
-        /* Alert scroll */
-        .alert-scroll { max-height: 360px; overflow-y: auto; }
-
         /* Chart canvas — fill parent container */
         canvas { max-width: 100%; max-height: 100%; }
 
-        /* Digital Twin — inline panel */
+        /* Alert scroll */
+        .alert-scroll { max-height: 360px; overflow-y: auto; }
+
+        /* Digital Twin — standalone panel */
         .dt-section { display: none; }
         .dt-section.active { display: block; }
-        #dt-canvas { width: 100%; height: 340px; display: block; cursor: grab; touch-action: none; border-radius: 8px; }
+        #dt-canvas { width: 100%; height: 340px; max-height: none; display: block; cursor: grab; touch-action: none; border-radius: 8px; }
         #dt-canvas:active { cursor: grabbing; }
         @media (max-width: 640px) {
-            #dt-canvas { height: 260px; }
+            #dt-canvas { height: 220px; }
             .dt-info { font-size: 11px; gap: 10px; }
         }
         .dt-info {
@@ -338,8 +338,6 @@
                 <div class="alert-scroll flex-1 p-3 space-y-2" id="alert-feed">
                     <!-- Alerts injected by JS -->
                 </div>
-
-                <!-- Vehicle Status -->
                 <div class="border-t border-atl-border p-4">
                     <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Vehicle Fleet Status</h4>
                     <div class="space-y-2.5">
@@ -373,6 +371,23 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ─── DIGITAL TWIN (inline) ─── -->
+        <div id="dt-section" class="dt-section">
+            <div class="bg-atl-card rounded-xl border border-atl-border p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                            <i class="fa-solid fa-cube text-blue-400 text-sm"></i>
+                        </div>
+                        <h3 id="dt-title" class="text-sm font-semibold text-white">Digital Twin</h3>
+                    </div>
+                    <button id="dt-close" title="Close" class="w-7 h-7 rounded-lg bg-atl-dark border border-atl-border text-gray-400 hover:text-white hover:bg-atl-border flex items-center justify-center text-sm transition cursor-pointer">&times;</button>
+                </div>
+                <canvas id="dt-canvas"></canvas>
+                <div class="dt-info mt-3" id="dt-info"></div>
             </div>
         </div>
 
@@ -415,23 +430,6 @@
                 <div class="relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
                     <canvas id="chart-crime"></canvas>
                 </div>
-            </div>
-        </div>
-
-        <!-- ─── DIGITAL TWIN (inline) ─── -->
-        <div id="dt-section" class="dt-section">
-            <div class="bg-atl-card rounded-xl border border-atl-border p-4">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                            <i class="fa-solid fa-cube text-blue-400 text-sm"></i>
-                        </div>
-                        <h3 id="dt-title" class="text-sm font-semibold text-white">Digital Twin</h3>
-                    </div>
-                    <button id="dt-close" title="Close" class="w-7 h-7 rounded-lg bg-atl-dark border border-atl-border text-gray-400 hover:text-white hover:bg-atl-border flex items-center justify-center text-sm transition cursor-pointer">&times;</button>
-                </div>
-                <canvas id="dt-canvas"></canvas>
-                <div class="dt-info mt-3" id="dt-info"></div>
             </div>
         </div>
 
@@ -1192,9 +1190,7 @@ function addAlert(alert) {
             <p class="text-[10px] opacity-50 mt-0.5">${time}</p>
         </div>`;
     feed.insertBefore(el, feed.firstChild);
-    // Keep max 20 alerts
     while (feed.children.length > 20) feed.removeChild(feed.lastChild);
-    // Update count
     const count = Math.min(feed.children.length, 20);
     document.getElementById('alert-count').textContent = count + ' Active';
 }
@@ -1283,12 +1279,14 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 // ══════════════════════════════════════════
 (function() {
     'use strict';
+    console.log('[DT] IIFE started');
 
     var dtSection = document.getElementById('dt-section');
     var dtCanvas  = document.getElementById('dt-canvas');
     var dtTitle   = document.getElementById('dt-title');
     var dtInfo    = document.getElementById('dt-info');
     var dtClose   = document.getElementById('dt-close');
+    console.log('[DT] elements:', { section: !!dtSection, canvas: !!dtCanvas, title: !!dtTitle, close: !!dtClose });
 
     var dtScene, dtCamera, dtRenderer, dtAnimId;
 
@@ -1341,9 +1339,12 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         dtRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
         dtRenderer.toneMapping = THREE.ACESFilmicToneMapping;
         dtRenderer.toneMappingExposure = 1.1;
-        resizeTwin();
 
-        dtCamera = new THREE.PerspectiveCamera(35, dtCanvas.clientWidth / dtCanvas.clientHeight, 0.1, 100);
+        var w = dtCanvas.clientWidth || dtCanvas.parentElement.clientWidth || 400;
+        var h = dtCanvas.clientHeight || 340;
+        dtRenderer.setSize(w, h, false);
+
+        dtCamera = new THREE.PerspectiveCamera(35, w / h, 0.1, 100);
         updateCameraFromOrbit();
 
         // Key light (sun)
@@ -1378,7 +1379,8 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 
     function resizeTwin() {
         if (!dtRenderer) return;
-        var w = dtCanvas.clientWidth, h = dtCanvas.clientHeight;
+        var w = dtCanvas.clientWidth || dtCanvas.parentElement.clientWidth || 400;
+        var h = dtCanvas.clientHeight || 340;
         dtRenderer.setSize(w, h, false);
         if (dtCamera) { dtCamera.aspect = w / h; dtCamera.updateProjectionMatrix(); }
     }
@@ -1409,6 +1411,7 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
     function tailMat() { return new THREE.MeshStandardMaterial({ color: 0xff2222, emissive: 0xff1111, emissiveIntensity: 0.6, roughness: 0.3 }); }
 
     function addShadow(mesh) { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; }
+    function pm(obj, props) { if (props.position) obj.position.copy(props.position); if (props.rotation) obj.rotation.copy(props.rotation); return obj; }
 
     // ── Detailed Wheel Assembly ──
     function buildWheel(radius, width) {
@@ -1457,11 +1460,11 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
     function buildMirror(color) {
         var g = new THREE.Group();
         // Arm
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.2), mat(color || 0x222222, 0.4, 0.15)), { position: new THREE.Vector3(0, 0, 0.1) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.2), mat(color || 0x222222, 0.4, 0.15)), { position: new THREE.Vector3(0, 0, 0.1) })));
         // Mirror housing
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.06), mat(color || 0x222222, 0.3, 0.2)), { position: new THREE.Vector3(0, 0, 0.22) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.06), mat(color || 0x222222, 0.3, 0.2)), { position: new THREE.Vector3(0, 0, 0.22) })));
         // Reflective surface
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.07), new THREE.MeshStandardMaterial({ color: 0xaabbcc, roughness: 0.0, metalness: 1.0 })), { position: new THREE.Vector3(-0.062, 0, 0.22) }));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.07), new THREE.MeshStandardMaterial({ color: 0xaabbcc, roughness: 0.0, metalness: 1.0 })), { position: new THREE.Vector3(-0.062, 0, 0.22) }));
         return g;
     }
 
@@ -1473,10 +1476,10 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         var bodyColor = 0x0a2463, accentColor = 0x1e40af;
 
         // ── Chassis / underbody ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.1, 1.1), mat(0x111111, 0.8, 0.1)), { position: new THREE.Vector3(0, 0.12, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.1, 1.1), mat(0x111111, 0.8, 0.1)), { position: new THREE.Vector3(0, 0.12, 0) })));
         // Exhaust pipes
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.3, 8), chromeMat()), { position: new THREE.Vector3(-1.2, 0.12, 0.35), rotation: new THREE.Euler(0, 0, Math.PI / 2) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.3, 8), chromeMat()), { position: new THREE.Vector3(-1.2, 0.12, -0.35), rotation: new THREE.Euler(0, 0, Math.PI / 2) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.3, 8), chromeMat()), { position: new THREE.Vector3(-1.2, 0.12, 0.35), rotation: new THREE.Euler(0, 0, Math.PI / 2) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.3, 8), chromeMat()), { position: new THREE.Vector3(-1.2, 0.12, -0.35), rotation: new THREE.Euler(0, 0, Math.PI / 2) })));
 
         // ── Lower body (main) ──
         var bodyShape = new THREE.Shape();
@@ -1532,36 +1535,36 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         });
 
         // ── White body stripe (POLICE marking line) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 0.02), mat(0xffffff, 0.5, 0.0)), { position: new THREE.Vector3(0, 0.52, 0.555) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 0.02), mat(0xffffff, 0.5, 0.0)), { position: new THREE.Vector3(0, 0.52, -0.555) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 0.02), mat(0xffffff, 0.5, 0.0)), { position: new THREE.Vector3(0, 0.52, 0.555) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 0.02), mat(0xffffff, 0.5, 0.0)), { position: new THREE.Vector3(0, 0.52, -0.555) })));
 
         // ── Light Bar (detailed) ──
         var lbar = new THREE.Group();
         // Base
-        lbar.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.28), mat(0x222222, 0.5, 0.3)), { position: new THREE.Vector3(0, 0, 0) })));
+        lbar.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.28), mat(0x222222, 0.5, 0.3)), { position: new THREE.Vector3(0, 0, 0) })));
         // Clear housing
-        lbar.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.1, 0.26), new THREE.MeshStandardMaterial({ color: 0xaabbcc, roughness: 0.05, transparent: true, opacity: 0.25 })), { position: new THREE.Vector3(0, 0.07, 0) }));
+        lbar.add(pm(new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.1, 0.26), new THREE.MeshStandardMaterial({ color: 0xaabbcc, roughness: 0.05, transparent: true, opacity: 0.25 })), { position: new THREE.Vector3(0, 0.07, 0) }));
         // Red LEDs (left side)
         for (var lr = 0; lr < 4; lr++) {
-            lbar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(0.15 + lr * 0.08, 0.07, 0.06) }));
-            lbar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(0.15 + lr * 0.08, 0.07, -0.06) }));
+            lbar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(0.15 + lr * 0.08, 0.07, 0.06) }));
+            lbar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(0.15 + lr * 0.08, 0.07, -0.06) }));
         }
         // Blue LEDs (right side)
         for (var lb = 0; lb < 4; lb++) {
-            lbar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0x0044ff, 2.0)), { position: new THREE.Vector3(-0.15 - lb * 0.08, 0.07, 0.06) }));
-            lbar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0x0044ff, 2.0)), { position: new THREE.Vector3(-0.15 - lb * 0.08, 0.07, -0.06) }));
+            lbar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0x0044ff, 2.0)), { position: new THREE.Vector3(-0.15 - lb * 0.08, 0.07, 0.06) }));
+            lbar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), emitMat(0x0044ff, 2.0)), { position: new THREE.Vector3(-0.15 - lb * 0.08, 0.07, -0.06) }));
         }
         // White center LED
-        lbar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), emitMat(0xffffff, 1.5)), { position: new THREE.Vector3(0, 0.07, 0) }));
+        lbar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), emitMat(0xffffff, 1.5)), { position: new THREE.Vector3(0, 0.07, 0) }));
         lbar.position.set(-0.05, 1.17, 0);
         g.add(lbar);
 
         // ── Push Bar (front bull bar) ──
         var pushBar = new THREE.Group();
-        pushBar.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.25, 0.22), rotation: new THREE.Euler(0, 0, 0) })));
-        pushBar.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.25, -0.22), rotation: new THREE.Euler(0, 0, 0) })));
-        pushBar.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.5, 0), rotation: new THREE.Euler(Math.PI / 2, 0, 0) })));
-        pushBar.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.3, 0), rotation: new THREE.Euler(Math.PI / 2, 0, 0) })));
+        pushBar.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.25, 0.22), rotation: new THREE.Euler(0, 0, 0) })));
+        pushBar.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.25, -0.22), rotation: new THREE.Euler(0, 0, 0) })));
+        pushBar.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.5, 0), rotation: new THREE.Euler(Math.PI / 2, 0, 0) })));
+        pushBar.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), chromeMat()), { position: new THREE.Vector3(0, 0.3, 0), rotation: new THREE.Euler(Math.PI / 2, 0, 0) })));
         pushBar.position.set(1.35, 0.0, 0);
         g.add(pushBar);
 
@@ -1570,26 +1573,26 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         var hl2 = buildHeadlight(0.08); hl2.position.set(1.32, 0.45, -0.35); g.add(hl2);
 
         // ── Taillights ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.32, 0.45, 0.38) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.32, 0.45, -0.38) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.32, 0.45, 0.38) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.32, 0.45, -0.38) })));
 
         // ── Front & rear bumpers ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 1.12), mat(0x222222, 0.6, 0.3)), { position: new THREE.Vector3(1.3, 0.25, 0) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 1.12), mat(0x222222, 0.6, 0.3)), { position: new THREE.Vector3(-1.32, 0.25, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 1.12), mat(0x222222, 0.6, 0.3)), { position: new THREE.Vector3(1.3, 0.25, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 1.12), mat(0x222222, 0.6, 0.3)), { position: new THREE.Vector3(-1.32, 0.25, 0) })));
 
         // ── License plates ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.065, 0.15), mat(0xeeeeee, 0.6, 0.0)), { position: new THREE.Vector3(1.35, 0.28, 0) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.065, 0.15), mat(0xeeeeee, 0.6, 0.0)), { position: new THREE.Vector3(-1.35, 0.28, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.065, 0.15), mat(0xeeeeee, 0.6, 0.0)), { position: new THREE.Vector3(1.35, 0.28, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.065, 0.15), mat(0xeeeeee, 0.6, 0.0)), { position: new THREE.Vector3(-1.35, 0.28, 0) })));
 
         // ── Side Mirrors ──
         var mirL = buildMirror(bodyColor); mirL.position.set(0.3, 0.85, 0.55); g.add(mirL);
         var mirR = buildMirror(bodyColor); mirR.position.set(0.3, 0.85, -0.55); mirR.scale.z = -1; g.add(mirR);
 
         // ── Spotlight (driver side) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.1, 12), mat(0x222222, 0.3, 0.5)), { position: new THREE.Vector3(0.15, 1.2, 0.52), rotation: new THREE.Euler(0, 0, Math.PI / 2) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.1, 12), mat(0x222222, 0.3, 0.5)), { position: new THREE.Vector3(0.15, 1.2, 0.52), rotation: new THREE.Euler(0, 0, Math.PI / 2) })));
 
         // ── Antenna ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.4, 6), mat(0x111111, 0.7, 0.3)), { position: new THREE.Vector3(-0.4, 1.38, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.4, 6), mat(0x111111, 0.7, 0.3)), { position: new THREE.Vector3(-0.4, 1.38, 0) })));
 
         // ── Wheels ──
         var positions = [[0.75, 0.22, 0.56], [0.75, 0.22, -0.56], [-0.75, 0.22, 0.56], [-0.75, 0.22, -0.56]];
@@ -1621,7 +1624,7 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         var g = new THREE.Group();
 
         // ── Chassis ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.1, 1.2), mat(0x111111, 0.8, 0.1)), { position: new THREE.Vector3(0, 0.15, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.1, 1.2), mat(0x111111, 0.8, 0.1)), { position: new THREE.Vector3(0, 0.15, 0) })));
 
         // ── Cab section ──
         var cabShape = new THREE.Shape();
@@ -1633,10 +1636,10 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         cabMesh.position.set(0.48, 0.2, -0.54); g.add(cabMesh);
 
         // Cab windshield
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.45), glassMat()), { position: new THREE.Vector3(1.44, 0.6, 0), rotation: new THREE.Euler(0, Math.PI / 2 - 0.08, 0) }));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.45), glassMat()), { position: new THREE.Vector3(1.44, 0.6, 0), rotation: new THREE.Euler(0, Math.PI / 2 - 0.08, 0) }));
         // Cab side windows
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), glassMat()), { position: new THREE.Vector3(0.8, 0.65, 0.55), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), glassMat()), { position: new THREE.Vector3(0.8, 0.65, -0.55), rotation: new THREE.Euler(0, -Math.PI / 2, 0) }));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), glassMat()), { position: new THREE.Vector3(0.8, 0.65, 0.55), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), glassMat()), { position: new THREE.Vector3(0.8, 0.65, -0.55), rotation: new THREE.Euler(0, -Math.PI / 2, 0) }));
 
         // ── Patient compartment (box body) ──
         var boxShape = new THREE.Shape();
@@ -1648,51 +1651,51 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         boxMesh.position.set(-1.05, 0.2, -0.58); g.add(boxMesh);
 
         // ── Red stripe band (Chevron "Star of Life" stripe) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.12, 0.02), mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.3, 0.65, 0.59) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.12, 0.02), mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.3, 0.65, -0.59) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.12, 1.2), mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.3, 0.38, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.12, 0.02), mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.3, 0.65, 0.59) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.12, 0.02), mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.3, 0.65, -0.59) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.12, 1.2), mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.3, 0.38, 0) })));
 
         // ── Star of Life / Red Cross (rear) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.35, 0.07), mat(0xdd0000, 0.3, 0.1)), { position: new THREE.Vector3(-1.07, 0.8, 0) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.07, 0.35), mat(0xdd0000, 0.3, 0.1)), { position: new THREE.Vector3(-1.07, 0.8, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.35, 0.07), mat(0xdd0000, 0.3, 0.1)), { position: new THREE.Vector3(-1.07, 0.8, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.07, 0.35), mat(0xdd0000, 0.3, 0.1)), { position: new THREE.Vector3(-1.07, 0.8, 0) })));
 
         // ── Rear doors (with window) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.85, 0.01), mat(0x333333, 0.8, 0.0)), { position: new THREE.Vector3(-1.06, 0.65, 0) })));
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.25), glassMat()), { position: new THREE.Vector3(-1.07, 0.95, 0.2), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.25), glassMat()), { position: new THREE.Vector3(-1.07, 0.95, -0.2), rotation: new THREE.Euler(0, -Math.PI / 2, 0) }));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.85, 0.01), mat(0x333333, 0.8, 0.0)), { position: new THREE.Vector3(-1.06, 0.65, 0) })));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.25), glassMat()), { position: new THREE.Vector3(-1.07, 0.95, 0.2), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.25), glassMat()), { position: new THREE.Vector3(-1.07, 0.95, -0.2), rotation: new THREE.Euler(0, -Math.PI / 2, 0) }));
         // Door handles
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.04), chromeMat()), { position: new THREE.Vector3(-1.08, 0.6, 0.12) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.04), chromeMat()), { position: new THREE.Vector3(-1.08, 0.6, -0.12) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.04), chromeMat()), { position: new THREE.Vector3(-1.08, 0.6, 0.12) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.04), chromeMat()), { position: new THREE.Vector3(-1.08, 0.6, -0.12) })));
 
         // ── Roof light bar ──
         var roofBar = new THREE.Group();
-        roofBar.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.22), mat(0x333333, 0.5, 0.3)), { position: new THREE.Vector3(0, 0, 0) })));
-        roofBar.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.08, 0.2), new THREE.MeshStandardMaterial({ color: 0xaabbcc, roughness: 0.05, transparent: true, opacity: 0.2 })), { position: new THREE.Vector3(0, 0.05, 0) }));
+        roofBar.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.22), mat(0x333333, 0.5, 0.3)), { position: new THREE.Vector3(0, 0, 0) })));
+        roofBar.add(pm(new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.08, 0.2), new THREE.MeshStandardMaterial({ color: 0xaabbcc, roughness: 0.05, transparent: true, opacity: 0.2 })), { position: new THREE.Vector3(0, 0.05, 0) }));
         for (var rl = 0; rl < 3; rl++) {
-            roofBar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(0.1 + rl * 0.08, 0.05, 0.05) }));
-            roofBar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xffffff, 1.8)), { position: new THREE.Vector3(0.1 + rl * 0.08, 0.05, -0.05) }));
-            roofBar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(-0.1 - rl * 0.08, 0.05, 0.05) }));
-            roofBar.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xffffff, 1.8)), { position: new THREE.Vector3(-0.1 - rl * 0.08, 0.05, -0.05) }));
+            roofBar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(0.1 + rl * 0.08, 0.05, 0.05) }));
+            roofBar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xffffff, 1.8)), { position: new THREE.Vector3(0.1 + rl * 0.08, 0.05, -0.05) }));
+            roofBar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xff0000, 2.0)), { position: new THREE.Vector3(-0.1 - rl * 0.08, 0.05, 0.05) }));
+            roofBar.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), emitMat(0xffffff, 1.8)), { position: new THREE.Vector3(-0.1 - rl * 0.08, 0.05, -0.05) }));
         }
         roofBar.position.set(0.8, 0.88, 0); g.add(roofBar);
 
         // ── Headlights / Taillights ──
         var hlA1 = buildHeadlight(0.07); hlA1.position.set(1.44, 0.38, 0.38); g.add(hlA1);
         var hlA2 = buildHeadlight(0.07); hlA2.position.set(1.44, 0.38, -0.38); g.add(hlA2);
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.08, 0.12), tailMat()), { position: new THREE.Vector3(-1.07, 0.35, 0.42) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.08, 0.12), tailMat()), { position: new THREE.Vector3(-1.07, 0.35, -0.42) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.08, 0.12), tailMat()), { position: new THREE.Vector3(-1.07, 0.35, 0.42) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.08, 0.12), tailMat()), { position: new THREE.Vector3(-1.07, 0.35, -0.42) })));
 
         // ── Bumpers ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.22), chromeMat()), { position: new THREE.Vector3(1.44, 0.24, 0) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.22), mat(0x333333, 0.5, 0.3)), { position: new THREE.Vector3(-1.08, 0.24, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.22), chromeMat()), { position: new THREE.Vector3(1.44, 0.24, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.22), mat(0x333333, 0.5, 0.3)), { position: new THREE.Vector3(-1.08, 0.24, 0) })));
 
         // ── Side Mirrors ──
         var ml = buildMirror(0xf5f5f5); ml.position.set(0.95, 0.78, 0.58); g.add(ml);
         var mr = buildMirror(0xf5f5f5); mr.position.set(0.95, 0.78, -0.58); mr.scale.z = -1; g.add(mr);
 
         // ── Step rails (side grab handles) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.35, 6), chromeMat()), { position: new THREE.Vector3(-0.8, 0.5, 0.6) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.35, 6), chromeMat()), { position: new THREE.Vector3(-0.8, 0.5, -0.6) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.35, 6), chromeMat()), { position: new THREE.Vector3(-0.8, 0.5, 0.6) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.35, 6), chromeMat()), { position: new THREE.Vector3(-0.8, 0.5, -0.6) })));
 
         // ── Wheels ──
         [[0.85, 0.22, 0.6], [0.85, 0.22, -0.6], [-0.7, 0.22, 0.6], [-0.7, 0.22, -0.6]].forEach(function(p) {
@@ -1711,7 +1714,7 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         var busYellow = 0xf0a500, busDark = 0xb47800;
 
         // ── Chassis/frame ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 1.12), mat(0x111111, 0.8, 0.1)), { position: new THREE.Vector3(0, 0.14, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 1.12), mat(0x111111, 0.8, 0.1)), { position: new THREE.Vector3(0, 0.14, 0) })));
 
         // ── Main body ──
         var busShape = new THREE.Shape();
@@ -1725,20 +1728,20 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         busMesh.position.set(0, 0.2, -0.55); g.add(busMesh);
 
         // ── Black stripe (regulation bumper trim) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(3.22, 0.1, 0.02), mat(0x111111, 0.8, 0.0)), { position: new THREE.Vector3(0, 0.32, 0.56) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(3.22, 0.1, 0.02), mat(0x111111, 0.8, 0.0)), { position: new THREE.Vector3(0, 0.32, -0.56) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(3.22, 0.1, 0.02), mat(0x111111, 0.8, 0.0)), { position: new THREE.Vector3(0, 0.32, 0.56) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(3.22, 0.1, 0.02), mat(0x111111, 0.8, 0.0)), { position: new THREE.Vector3(0, 0.32, -0.56) })));
 
         // ── Roof (slightly darker) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(3.18, 0.04, 1.08), glossMat(busDark)), { position: new THREE.Vector3(0, 1.07, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(3.18, 0.04, 1.08), glossMat(busDark)), { position: new THREE.Vector3(0, 1.07, 0) })));
 
         // ── Roof warning lights ──
-        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xff0000, 1.5)), { position: new THREE.Vector3(1.3, 1.12, 0.25) }));
-        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xff0000, 1.5)), { position: new THREE.Vector3(1.3, 1.12, -0.25) }));
-        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xffaa00, 1.5)), { position: new THREE.Vector3(1.4, 1.12, 0.15) }));
-        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xffaa00, 1.5)), { position: new THREE.Vector3(1.4, 1.12, -0.15) }));
+        g.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xff0000, 1.5)), { position: new THREE.Vector3(1.3, 1.12, 0.25) }));
+        g.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xff0000, 1.5)), { position: new THREE.Vector3(1.3, 1.12, -0.25) }));
+        g.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xffaa00, 1.5)), { position: new THREE.Vector3(1.4, 1.12, 0.15) }));
+        g.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 10), emitMat(0xffaa00, 1.5)), { position: new THREE.Vector3(1.4, 1.12, -0.15) }));
 
         // ── Windshield (wrap-around) ──
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.55), glassMat()), { position: new THREE.Vector3(1.61, 0.78, 0), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.55), glassMat()), { position: new THREE.Vector3(1.61, 0.78, 0), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
 
         // ── Windows (both sides) ──
         for (var wi = -4; wi <= 3; wi++) {
@@ -1751,11 +1754,11 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         }
 
         // ── Rear window ──
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.35), glassMat()), { position: new THREE.Vector3(-1.61, 0.82, 0), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.35), glassMat()), { position: new THREE.Vector3(-1.61, 0.82, 0), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
 
         // ── Stop sign arm (folded, left side) ──
         var stopArm = new THREE.Group();
-        stopArm.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.25), mat(0x333333, 0.6, 0.2)), { position: new THREE.Vector3(0, 0, 0.12) })));
+        stopArm.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.25), mat(0x333333, 0.6, 0.2)), { position: new THREE.Vector3(0, 0, 0.12) })));
         // Octagonal stop sign
         var octShape = new THREE.Shape();
         var octR = 0.09;
@@ -1766,28 +1769,28 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         }
         octShape.closePath();
         var octGeo = new THREE.ShapeGeometry(octShape);
-        stopArm.add(Object.assign(new THREE.Mesh(octGeo, mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.01, 0, 0.26) }));
+        stopArm.add(pm(new THREE.Mesh(octGeo, mat(0xcc0000, 0.4, 0.1)), { position: new THREE.Vector3(-0.01, 0, 0.26) }));
         stopArm.position.set(0.6, 0.75, 0.58);
         g.add(stopArm);
 
         // ── Entrance door (right front) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.65, 0.38), mat(0x222222, 0.8, 0.0)), { position: new THREE.Vector3(1.1, 0.55, -0.38) })));
-        g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.4), glassMat()), { position: new THREE.Vector3(1.1, 0.7, -0.38), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.65, 0.38), mat(0x222222, 0.8, 0.0)), { position: new THREE.Vector3(1.1, 0.55, -0.38) })));
+        g.add(pm(new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.4), glassMat()), { position: new THREE.Vector3(1.1, 0.7, -0.38), rotation: new THREE.Euler(0, Math.PI / 2, 0) }));
 
         // ── Headlights ──
         var hlB1 = buildHeadlight(0.065); hlB1.position.set(1.6, 0.4, 0.38); g.add(hlB1);
         var hlB2 = buildHeadlight(0.065); hlB2.position.set(1.6, 0.4, -0.38); g.add(hlB2);
         // Turn signals
-        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), emitMat(0xffaa00, 0.8)), { position: new THREE.Vector3(1.6, 0.32, 0.45) }));
-        g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), emitMat(0xffaa00, 0.8)), { position: new THREE.Vector3(1.6, 0.32, -0.45) }));
+        g.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), emitMat(0xffaa00, 0.8)), { position: new THREE.Vector3(1.6, 0.32, 0.45) }));
+        g.add(pm(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), emitMat(0xffaa00, 0.8)), { position: new THREE.Vector3(1.6, 0.32, -0.45) }));
 
         // ── Taillights ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.61, 0.38, 0.38) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.61, 0.38, -0.38) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.61, 0.38, 0.38) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.1, 0.15), tailMat()), { position: new THREE.Vector3(-1.61, 0.38, -0.38) })));
 
         // ── Bumpers ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.14), chromeMat()), { position: new THREE.Vector3(1.62, 0.22, 0) })));
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.14), mat(0x333333, 0.6, 0.2)), { position: new THREE.Vector3(-1.62, 0.22, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.14), chromeMat()), { position: new THREE.Vector3(1.62, 0.22, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.14), mat(0x333333, 0.6, 0.2)), { position: new THREE.Vector3(-1.62, 0.22, 0) })));
 
         // ── Side mirrors ──
         var smL = buildMirror(busYellow); smL.position.set(1.35, 0.9, 0.58); g.add(smL);
@@ -1809,7 +1812,7 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         var g = new THREE.Group();
 
         // ── Concrete base ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.12, 0.65), mat(0x666666, 0.9, 0.0)), { position: new THREE.Vector3(0, 0.06, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.12, 0.65), mat(0x666666, 0.9, 0.0)), { position: new THREE.Vector3(0, 0.06, 0) })));
 
         // ── Main pole (tapered) ──
         var pole = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.2, 16), mat(0x555555, 0.5, 0.4)));
@@ -1823,9 +1826,9 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         function buildSignalHead(x, y, z, activeCol) {
             var h = new THREE.Group();
             // Back plate
-            h.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.95, 0.2), mat(0x1a1a1a, 0.6, 0.3)), { position: new THREE.Vector3(0, 0, -0.05) })));
+            h.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.95, 0.2), mat(0x1a1a1a, 0.6, 0.3)), { position: new THREE.Vector3(0, 0, -0.05) })));
             // Front housing
-            h.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.92, 0.08), mat(0x222222, 0.5, 0.2)), { position: new THREE.Vector3(0, 0, 0.09) })));
+            h.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.92, 0.08), mat(0x222222, 0.5, 0.2)), { position: new THREE.Vector3(0, 0, 0.09) })));
             // Visors for each light
             [{cy: 0.28}, {cy: 0}, {cy: -0.28}].forEach(function(v) {
                 var visorShape = new THREE.Shape();
@@ -1845,7 +1848,7 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
             lights.forEach(function(l) {
                 var on = l.name === activeCol;
                 // Outer ring
-                h.add(addShadow(Object.assign(new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.012, 8, 24), mat(0x333333, 0.5, 0.3)), { position: new THREE.Vector3(0, l.cy, 0.14) })));
+                h.add(addShadow(pm(new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.012, 8, 24), mat(0x333333, 0.5, 0.3)), { position: new THREE.Vector3(0, l.cy, 0.14) })));
                 // Lens
                 var lensMat = new THREE.MeshStandardMaterial({
                     color: on ? l.c : 0x222222,
@@ -1877,16 +1880,16 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 
         // ── Pedestrian signal (on pole, lower) ──
         var pedBox = new THREE.Group();
-        pedBox.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.1), mat(0x1a1a1a, 0.6, 0.3)), { position: new THREE.Vector3(0, 0, 0) })));
+        pedBox.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.1), mat(0x1a1a1a, 0.6, 0.3)), { position: new THREE.Vector3(0, 0, 0) })));
         // Walk symbol (white)
-        pedBox.add(Object.assign(new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), emitMat(0xffffff, 0.8)), { position: new THREE.Vector3(0, 0.05, 0.055) }));
+        pedBox.add(pm(new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), emitMat(0xffffff, 0.8)), { position: new THREE.Vector3(0, 0.05, 0.055) }));
         // Don't walk (orange, dim)
-        pedBox.add(Object.assign(new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), new THREE.MeshStandardMaterial({ color: 0x332200, emissive: 0xff6600, emissiveIntensity: 0.15, roughness: 0.4 })), { position: new THREE.Vector3(0, -0.07, 0.055) }));
+        pedBox.add(pm(new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), new THREE.MeshStandardMaterial({ color: 0x332200, emissive: 0xff6600, emissiveIntensity: 0.15, roughness: 0.4 })), { position: new THREE.Vector3(0, -0.07, 0.055) }));
         pedBox.position.set(0.15, 2.0, 0.1);
         g.add(pedBox);
 
         // ── Street sign plate (on pole) ──
-        g.add(addShadow(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.15, 0.55), mat(0x115533, 0.5, 0.1)), { position: new THREE.Vector3(0, 3.5, 0) })));
+        g.add(addShadow(pm(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.15, 0.55), mat(0x115533, 0.5, 0.1)), { position: new THREE.Vector3(0, 3.5, 0) })));
 
         // Scale to fit viewer
         g.scale.set(0.6, 0.6, 0.6);
@@ -1896,8 +1899,15 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 
     // ── Open / Close ──
     function openDigitalTwin(type, label, extra) {
-        if (!dtScene) initTwin();
+        console.log('[DT] openDigitalTwin called:', type, label);
+        // Show section first so canvas has real dimensions
+        dtSection.classList.add('active');
+        // Force reflow so clientWidth/Height are available
+        void dtSection.offsetHeight;
+        console.log('[DT] canvas dims after reflow:', dtCanvas.clientWidth, dtCanvas.clientHeight);
+        if (!dtScene) { console.log('[DT] initializing Twin...'); initTwin(); }
         clearScene();
+        console.log('[DT] scene cleared, building model:', type);
         var model, badgeColor, badgeText, statusText;
         switch (type) {
             case 'police':    model = buildPoliceCar();              badgeColor='#2563EB'; badgeText='APD';        statusText='Patrolling'; break;
@@ -1914,9 +1924,10 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
             '<span><i class="fa-solid fa-circle" style="font-size:7px;color:'+badgeColor+'"></i> '+statusText+'</span>'+
             '<span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate \u00b7 Scroll to zoom</span>';
         resizeTwin();
-        dtSection.classList.add('active');
+        console.log('[DT] model added, starting animation. Renderer size:', dtRenderer.getSize(new THREE.Vector2()));
         dtSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
         animateTwin();
+        requestAnimationFrame(function() { resizeTwin(); });
     }
 
     function closeDigitalTwin() {
