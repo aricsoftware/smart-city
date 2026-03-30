@@ -104,41 +104,16 @@
         /* Chart canvas — fill parent container */
         canvas { max-width: 100%; max-height: 100%; }
 
-        /* Digital Twin Modal */
-        .dt-overlay {
-            position: fixed; inset: 0; z-index: 9999;
-            background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none; transition: opacity .3s;
-        }
-        .dt-overlay.active { opacity: 1; pointer-events: auto; }
-        .dt-panel {
-            background: #111827; border: 1px solid #374151; border-radius: 16px;
-            width: 520px; max-width: 94vw; overflow: hidden;
-            box-shadow: 0 24px 48px rgba(0,0,0,.5);
-        }
-        .dt-header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 20px; border-bottom: 1px solid #374151;
-        }
-        .dt-header h3 { font-size: 15px; font-weight: 700; color: #F9FAFB; }
-        .dt-close {
-            width: 28px; height: 28px; border-radius: 8px; border: none;
-            background: #1F2937; color: #9CA3AF; font-size: 16px;
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: background .2s, color .2s;
-        }
-        .dt-close:hover { background: #374151; color: #F9FAFB; }
-        #dt-canvas { width: 100%; height: 340px; display: block; cursor: grab; touch-action: none; }
+        /* Digital Twin — inline panel */
+        .dt-section { display: none; }
+        .dt-section.active { display: block; }
+        #dt-canvas { width: 100%; height: 340px; display: block; cursor: grab; touch-action: none; border-radius: 8px; }
         #dt-canvas:active { cursor: grabbing; }
-        @media (max-width: 600px) {
-            .dt-panel { border-radius: 12px; }
+        @media (max-width: 640px) {
             #dt-canvas { height: 260px; }
-            .dt-close { width: 36px; height: 36px; font-size: 20px; }
-            .dt-info { font-size: 11px; gap: 10px; padding: 10px 14px; }
+            .dt-info { font-size: 11px; gap: 10px; }
         }
         .dt-info {
-            padding: 12px 20px; border-top: 1px solid #374151;
             font-size: 12px; color: #9CA3AF;
             display: flex; gap: 16px; flex-wrap: wrap;
         }
@@ -440,6 +415,23 @@
                 <div class="relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
                     <canvas id="chart-crime"></canvas>
                 </div>
+            </div>
+        </div>
+
+        <!-- ─── DIGITAL TWIN (inline) ─── -->
+        <div id="dt-section" class="dt-section">
+            <div class="bg-atl-card rounded-xl border border-atl-border p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                            <i class="fa-solid fa-cube text-blue-400 text-sm"></i>
+                        </div>
+                        <h3 id="dt-title" class="text-sm font-semibold text-white">Digital Twin</h3>
+                    </div>
+                    <button id="dt-close" title="Close" class="w-7 h-7 rounded-lg bg-atl-dark border border-atl-border text-gray-400 hover:text-white hover:bg-atl-border flex items-center justify-center text-sm transition cursor-pointer">&times;</button>
+                </div>
+                <canvas id="dt-canvas"></canvas>
+                <div class="dt-info mt-3" id="dt-info"></div>
             </div>
         </div>
 
@@ -1282,17 +1274,7 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 
 </script>
 
-<!-- ─── DIGITAL TWIN MODAL ─── -->
-<div id="dt-overlay" class="dt-overlay">
-    <div class="dt-panel">
-        <div class="dt-header">
-            <h3 id="dt-title">Digital Twin</h3>
-            <button class="dt-close" id="dt-close" title="Close">&times;</button>
-        </div>
-        <canvas id="dt-canvas"></canvas>
-        <div class="dt-info" id="dt-info"></div>
-    </div>
-</div>
+
 
 <script>
 // ══════════════════════════════════════════
@@ -1302,7 +1284,7 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
 (function() {
     'use strict';
 
-    var dtOverlay = document.getElementById('dt-overlay');
+    var dtSection = document.getElementById('dt-section');
     var dtCanvas  = document.getElementById('dt-canvas');
     var dtTitle   = document.getElementById('dt-title');
     var dtInfo    = document.getElementById('dt-info');
@@ -1932,53 +1914,37 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
             '<span><i class="fa-solid fa-circle" style="font-size:7px;color:'+badgeColor+'"></i> '+statusText+'</span>'+
             '<span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate \u00b7 Scroll to zoom</span>';
         resizeTwin();
-        dtOverlay.classList.add('active');
+        dtSection.classList.add('active');
+        dtSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
         animateTwin();
     }
 
     function closeDigitalTwin() {
-        dtOverlay.classList.remove('active');
+        dtSection.classList.remove('active');
         cancelAnimationFrame(dtAnimId);
         orbit.autoRotate = false;
     }
 
     dtClose.addEventListener('click', closeDigitalTwin);
-    dtOverlay.addEventListener('click', function(e) { if (e.target === dtOverlay) closeDigitalTwin(); });
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDigitalTwin(); });
     window.addEventListener('resize', resizeTwin);
 
     // Expose globally so map marker handlers can call it
     window.openDigitalTwin = openDigitalTwin;
 
-    // ── Wire vehicle markers ──
+    // ── Wire vehicle markers — click opens digital twin inline ──
     Object.keys(vehicleRoutes).forEach(function(id) {
         var v = vehicleRoutes[id];
-        var safeLabel = v.label.replace(/'/g, "\\'");
-        var speed = (15+Math.random()*20).toFixed(0);
-        vehicles[id].marker.unbindPopup();
-        vehicles[id].marker.bindPopup(
-            '<strong>'+v.label+'</strong><br>'+
-            'Status: Patrolling<br>'+
-            'Speed: '+speed+' mph<br>'+
-            '<a href="#" onclick="event.preventDefault();event.stopPropagation();window.openDigitalTwin(\''+v.type+"','"+safeLabel+"')\" "+
-            'style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;'+
-            'padding:6px 0;display:inline-block;-webkit-tap-highlight-color:rgba(96,165,250,0.3);touch-action:manipulation;">'+
-            '\uD83D\uDD0D View Digital Twin</a>'
-        );
+        vehicles[id].marker.on('click', function() {
+            window.openDigitalTwin(v.type, v.label);
+        });
     });
 
-    // ── Wire traffic light markers ──
+    // ── Wire traffic light markers — click opens digital twin inline ──
     trafficLights.forEach(function(tl) {
-        var safeName = tl.name.replace(/'/g, "\\'");
-        tl.marker.unbindPopup();
-        tl.marker.bindPopup(
-            '<strong>\uD83D\uDEA6 '+tl.name+'</strong><br>'+
-            'Status: <span style="color:'+(tl.color==='red'?'#EF4444':tl.color==='yellow'?'#FBBF24':'#10B981')+'">'+tl.color.toUpperCase()+'</span><br>'+
-            '<a href="#" onclick="event.preventDefault();event.stopPropagation();window.openDigitalTwin(\'traffic\',\'\uD83D\uDEA6 '+safeName+"')\" "+
-            'style="color:#60A5FA;text-decoration:underline;font-weight:600;font-size:12px;'+
-            'padding:6px 0;display:inline-block;-webkit-tap-highlight-color:rgba(96,165,250,0.3);touch-action:manipulation;">'+
-            '\uD83D\uDD0D View Digital Twin</a>'
-        );
+        tl.marker.on('click', function() {
+            window.openDigitalTwin('traffic', '\uD83D\uDEA6 ' + tl.name, tl.color);
+        });
     });
 
 })();
