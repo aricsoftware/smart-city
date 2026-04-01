@@ -768,6 +768,231 @@
 </div>
 
 <!-- ════════════════════════════════════════ -->
+<!-- DIGITAL TWIN CLASS HIERARCHY             -->
+<!-- (defined before map init so Vehicle      -->
+<!--  classes are available at startup)       -->
+<!-- ════════════════════════════════════════ -->
+<script>
+'use strict';
+
+var DT = {}; // Global Digital Twin namespace
+
+// ══ DigitalTwinBase ══════════════════════════════════════════
+class DigitalTwinBase {
+    constructor(config) {
+        this.id            = config.id            || '';
+        this.label         = config.label         || '';
+        this.type          = config.type          || '';
+        // Observable state
+        this.speed         = 0;                    // mph (0 = stationary / unknown)
+        this.statusText    = config.statusText    || 'Idle';
+        this.badgeText     = config.badgeText     || '';
+        this.badgeColor    = config.badgeColor    || '#6B7280';
+        // Asset / display
+        this.iconEmoji     = config.iconEmoji     || '📍';
+        this.glbFile       = config.glbFile       || null;
+        this.glbTargetSize = config.glbTargetSize || 3;
+        // Geospatial position (lat/lng)
+        this.position      = { lat: 0, lng: 0 };
+        // Three.js scene object — set after addToScene()
+        this._scene3d      = null;
+        // Simulated path — replaced by real telemetry later
+        this._route         = config.route || [];
+        this._routeIndex    = 0;
+        this._routeProgress = 0;
+    }
+
+    // Returns a THREE.Group (procedural geometry). Delegates to DT registry.
+    build() { return DT._build(this.type); }
+
+    // Apply livery / materials to a loaded GLTF model. Delegates to DT registry.
+    applyLivery(model) { DT._applyLivery(this.type, model); }
+
+    // Load GLTF (with procedural fallback) and add to Three.js scene.
+    addToScene(scene, glbLoader, doneCallback) {
+        if (this.glbFile) {
+            glbLoader.load(
+                this.glbFile,
+                (gltf) => {
+                    const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    this.applyLivery(model);
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                },
+                undefined,
+                (err) => {
+                    console.warn('[DT] GLTF load failed, procedural fallback:', err);
+                    const model = this.build();
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                }
+            );
+        } else {
+            const model = this.build();
+            this._scene3d = model;
+            scene.add(model);
+            if (doneCallback) doneCallback(model);
+        }
+    }
+
+    // Advance simulated route by one animation tick.
+    // Always called even when speed = 0 so position tracking is continuous.
+    // Returns { lat, lng } or null if no route is defined.
+    tickSimulation(ticksPerSegment) {
+        if (!this._route || this._route.length < 2) { this.speed = 0; return null; }
+        this._routeProgress += 1 / ticksPerSegment;
+        if (this._routeProgress >= 1) {
+            this._routeProgress = 0;
+            this._routeIndex = (this._routeIndex + 1) % this._route.length;
+        }
+        const from = this._route[this._routeIndex];
+        const to   = this._route[(this._routeIndex + 1) % this._route.length];
+        const lat  = from[0] + (to[0] - from[0]) * this._routeProgress;
+        const lng  = from[1] + (to[1] - from[1]) * this._routeProgress;
+        // Approximate speed: segment distance in miles / segment duration in hours
+        const dlat = to[0] - from[0], dlng = to[1] - from[1];
+        const segDistMi = Math.sqrt(dlat * dlat + dlng * dlng) * 69.0;
+        const segTimeHr = (30000 / 1000) / 3600; // WAYPOINT_DURATION ms → hours
+        this.speed    = Math.round(segDistMi / segTimeHr);
+        this.position = { lat, lng };
+        return { lat, lng };
+    }
+
+    // Returns the HTML string for the Digital Twin info bar.
+    renderInfoHTML() {
+        const bc = this.badgeColor;
+        return '<span><span class="dt-badge" style="background:' + bc + '22;color:' + bc + ';border:1px solid ' + bc + '44;">' + this.badgeText + '</span></span>' +
+               '<span><i class="fa-solid fa-circle" style="font-size:7px;color:' + bc + '"></i>\u00a0' + this.statusText + '</span>' +
+               '<span><i class="fa-solid fa-gauge-high" style="font-size:9px"></i>\u00a0' + Math.round(this.speed) + ' mph</span>' +
+               '<span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag \u00b7 Scroll</span>';
+    }
+}
+
+// ══ Vehicle ══════════════════════════════════════════════════
+class Vehicle extends DigitalTwinBase {
+    constructor(config) {
+        super(config);
+        this.mapMarker = null; // Leaflet marker — set by buildMapMarker()
+    }
+
+    // Create a Leaflet marker at the route start position and add to layerGroup.
+    buildMapMarker(leafletIcon, layerGroup) {
+        const startPos = this._route.length ? this._route[0] : [0, 0];
+        this.mapMarker = L.marker(startPos, { icon: leafletIcon })
+            .bindPopup(this._popupHTML());
+        layerGroup.addLayer(this.mapMarker);
+        return this.mapMarker;
+    }
+
+    _popupHTML() {
+        return '<strong>' + this.label + '</strong><br>Status: ' + this.statusText +
+               '<br>Speed: ' + Math.round(this.speed || 0) + ' mph';
+    }
+
+    updateMapPosition(lat, lng) {
+        if (this.mapMarker) this.mapMarker.setLatLng([lat, lng]);
+    }
+
+    // Advance simulation and update the Leaflet map marker in one call.
+    // Safe to call every tick — works correctly even when speed is 0.
+    tick(ticksPerSegment) {
+        const pos = this.tickSimulation(ticksPerSegment);
+        if (pos) this.updateMapPosition(pos.lat, pos.lng);
+        return pos;
+    }
+}
+
+// ══ PoliceCar ════════════════════════════════════════════════
+class PoliceCar extends Vehicle {
+    constructor(config) {
+        config.type          = 'police';
+        config.badgeText     = config.badgeText   || 'APD';
+        config.badgeColor    = config.badgeColor  || '#2563EB';
+        config.statusText    = config.statusText  || 'Patrolling';
+        config.iconEmoji     = '🚔';
+        config.glbFile       = 'models/police-car.glb';
+        config.glbTargetSize = 3;
+        super(config);
+    }
+}
+
+// ══ Ambulance ════════════════════════════════════════════════
+class Ambulance extends Vehicle {
+    constructor(config) {
+        config.type          = 'ambulance';
+        config.badgeText     = config.badgeText   || 'EMS';
+        config.badgeColor    = config.badgeColor  || '#DC2626';
+        config.statusText    = config.statusText  || 'En Route';
+        config.iconEmoji     = '🚑';
+        config.glbFile       = 'models/ambulance.glb';
+        config.glbTargetSize = 3;
+        super(config);
+    }
+}
+
+// ══ SchoolBus ════════════════════════════════════════════════
+class SchoolBus extends Vehicle {
+    constructor(config) {
+        config.type          = 'bus';
+        config.badgeText     = config.badgeText   || 'SCHOOL BUS';
+        config.badgeColor    = config.badgeColor  || '#D97706';
+        config.statusText    = config.statusText  || 'Active Route';
+        config.iconEmoji     = '🚌';
+        config.glbFile       = 'models/school-bus.glb';
+        config.glbTargetSize = 3;
+        super(config);
+    }
+
+    // Override addToScene: bus livery requires async PBR texture loading.
+    addToScene(scene, glbLoader, doneCallback) {
+        if (this.glbFile) {
+            glbLoader.load(
+                this.glbFile,
+                (gltf) => {
+                    const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    DT._loadBusTextures((textures) => {
+                        DT._applyBusLivery(model, textures);
+                        this._scene3d = model;
+                        scene.add(model);
+                        if (doneCallback) doneCallback(model);
+                    });
+                },
+                undefined,
+                (err) => {
+                    console.warn('[DT] Bus GLTF failed, procedural fallback:', err);
+                    const model = this.build();
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                }
+            );
+        } else {
+            const model = this.build();
+            this._scene3d = model;
+            scene.add(model);
+            if (doneCallback) doneCallback(model);
+        }
+    }
+}
+
+// Register classes on DT namespace
+DT.DigitalTwinBase  = DigitalTwinBase;
+DT.Vehicle          = Vehicle;
+DT.PoliceCar        = PoliceCar;
+DT.Ambulance        = Ambulance;
+DT.SchoolBus        = SchoolBus;
+
+// Stubs — replaced by the Three.js IIFE once it initialises
+DT._build           = function(type)         { return null; };
+DT._applyLivery     = function(type, model)  {};
+DT._addGLTFModel    = function(gltf, sz)     { return gltf.scene; };
+DT._loadBusTextures = function(cb)           { cb({}); };
+DT._applyBusLivery  = function(model, tex)   {};
+</script>
+
+<!-- ════════════════════════════════════════ -->
 <!-- JAVASCRIPT                               -->
 <!-- ════════════════════════════════════════ -->
 <script>
@@ -1033,20 +1258,17 @@ const trafficLayerGroup = L.layerGroup().addTo(map);
 const heatmapLayer = L.layerGroup();
 const zonesLayer = L.layerGroup();
 
-// ── Build Vehicle Markers ──
+// ── Build Vehicle Instances ──
+// Each entry is a typed class instance (PoliceCar / Ambulance / SchoolBus).
+// The class handles route tracking, speed computation, and 3-D rendering.
 const vehicles = {};
+const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus };
 Object.keys(vehicleRoutes).forEach(id => {
-    const v = vehicleRoutes[id];
-    const startPos = v.route[0];
-    const marker = L.marker(startPos, { icon: icons[v.type] })
-        .bindPopup(`<strong>${v.label}</strong><br>Status: Patrolling<br>Speed: ${(15 + Math.random() * 20).toFixed(0)} mph`);
-    vehicleLayerGroup.addLayer(marker);
-    vehicles[id] = {
-        marker,
-        route: v.route,
-        currentIndex: 0,
-        progress: 0
-    };
+    const vd  = vehicleRoutes[id];
+    const Cls = _vehicleClassMap[vd.type];
+    const instance = new Cls({ id: id, label: vd.label, route: vd.route });
+    instance.buildMapMarker(icons[vd.type], vehicleLayerGroup);
+    vehicles[id] = instance;
 });
 
 // ── Build Traffic Light Markers ──
@@ -1142,21 +1364,8 @@ function lerp(a, b, t) {
 }
 
 function animateVehicles() {
-    Object.keys(vehicles).forEach(id => {
-        const v = vehicles[id];
-        v.progress += 1 / TICKS_PER_SEGMENT;
-
-        if (v.progress >= 1) {
-            v.progress = 0;
-            v.currentIndex = (v.currentIndex + 1) % v.route.length;
-        }
-
-        const from = v.route[v.currentIndex];
-        const to = v.route[(v.currentIndex + 1) % v.route.length];
-        const lat = lerp(from[0], to[0], v.progress);
-        const lng = lerp(from[1], to[1], v.progress);
-        v.marker.setLatLng([lat, lng]);
-    });
+    // Delegates to each Vehicle instance — handles position, speed, and map update.
+    Object.keys(vehicles).forEach(id => vehicles[id].tick(TICKS_PER_SEGMENT));
 }
 
 setInterval(animateVehicles, TICK_INTERVAL);
@@ -2242,63 +2451,63 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
         model.add(rightDecal);
     }
 
+    // ── Register Three.js builders into DT namespace ──
+    // Called once — makes the class build() / applyLivery() methods functional.
+    DT._build = function(type) {
+        switch (type) {
+            case 'police':    return buildPoliceCar();
+            case 'ambulance': return buildAmbulance();
+            case 'bus':       return buildSchoolBus();
+            default:          return new THREE.Group();
+        }
+    };
+    DT._applyLivery     = function(type, model) { if (type === 'police') applyAPDLivery(model); };
+    DT._addGLTFModel    = addGLTFModel;
+    DT._loadBusTextures = loadBusTextures;
+    DT._applyBusLivery  = applyBusLivery;
+
     // ── Open / Close ──
-    function openDigitalTwin(type, label, extra) {
-        console.log('[DT] openDigitalTwin called:', type, label);
+    // vehicleId : key into vehicles{} (a Vehicle class instance), or null
+    // type      : 'traffic' when vehicleId is null
+    // label     : display name for non-vehicle entities
+    // extra     : active color for traffic lights
+    function openDigitalTwin(vehicleId, type, label, extra) {
+        var entity = (vehicleId && vehicles[vehicleId]) ? vehicles[vehicleId] : null;
+        var resolvedType  = entity ? entity.type  : (type  || '');
+        var resolvedLabel = entity ? entity.label : (label || '');
+
         dtSection.classList.add('active');
         void dtSection.offsetHeight;
         if (!dtScene) { initTwin(); }
         clearScene();
 
-        var badgeColor, badgeText, statusText;
-        switch (type) {
-            case 'police':    badgeColor='#2563EB'; badgeText='APD';        statusText='Patrolling'; break;
-            case 'ambulance': badgeColor='#DC2626'; badgeText='EMS';        statusText='En Route';   break;
-            case 'bus':       badgeColor='#D97706'; badgeText='SCHOOL BUS'; statusText='Active Route'; break;
-            case 'traffic':   badgeColor='#10B981'; badgeText='SIGNAL';     statusText=(extra||'red').toUpperCase(); break;
-            default: return;
+        orbit.theta = 0.8; orbit.phi = 0.6; orbit.radius = 7; orbit.autoRotate = true;
+        dtTitle.textContent = '\uD83D\uDD0D Digital Twin \u2014 ' + resolvedLabel;
+
+        if (entity) {
+            dtInfo.innerHTML = entity.renderInfoHTML();
+        } else {
+            var bc = '#10B981', bt = 'SIGNAL', st = (extra || 'red').toUpperCase();
+            dtInfo.innerHTML =
+                '<span><span class="dt-badge" style="background:' + bc + '22;color:' + bc + ';border:1px solid ' + bc + '44;">' + bt + '</span></span>' +
+                '<span><i class="fa-solid fa-circle" style="font-size:7px;color:' + bc + '"></i>\u00a0' + st + '</span>' +
+                '<span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag \u00b7 Scroll</span>';
         }
 
-        // Update UI immediately
-        orbit.theta = 0.8; orbit.phi = 0.6; orbit.radius = 7; orbit.autoRotate = true;
-        dtTitle.textContent = '\uD83D\uDD0D Digital Twin \u2014 ' + label;
-        dtInfo.innerHTML =
-            '<span><span class="dt-badge" style="background:'+badgeColor+'22;color:'+badgeColor+';border:1px solid '+badgeColor+'44;">'+badgeText+'</span></span>'+
-            '<span><i class="fa-solid fa-circle" style="font-size:7px;color:'+badgeColor+'"></i> '+statusText+'</span>'+
-            '<span style="margin-left:auto;color:#6B7280;"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate \u00b7 Scroll to zoom</span>';
         resizeTwin();
         dtSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
         animateTwin();
         requestAnimationFrame(function() { resizeTwin(); });
 
-        // Load GLTF model, fallback to procedural
-        var glbPath = glbFiles[type];
-        if (glbPath) {
-            glbLoader.load(glbPath, function(gltf) {
-                var model = addGLTFModel(gltf, type === 'traffic' ? 4 : 3);
-                console.log('[DT] GLTF model loaded:', type);
-                if (type === 'police') {
-                    applyAPDLivery(model);
-                    dtScene.add(model);
-                } else if (type === 'bus') {
-                    // Load PBR textures first, then apply livery and add to scene
-                    loadBusTextures(function(textures) {
-                        applyBusLivery(model, textures);
-                        dtScene.add(model);
-                    });
-                } else {
-                    dtScene.add(model);
-                }
+        if (entity) {
+            // Vehicle instance owns its own load + build + livery logic
+            entity.addToScene(dtScene, glbLoader);
+        } else if (resolvedType === 'traffic') {
+            glbLoader.load(glbFiles['traffic'], function(gltf) {
+                dtScene.add(addGLTFModel(gltf, 4));
             }, undefined, function(err) {
-                console.warn('[DT] GLTF load failed, using procedural fallback:', err);
-                var model;
-                switch (type) {
-                    case 'police':    model = buildPoliceCar(); break;
-                    case 'ambulance': model = buildAmbulance(); break;
-                    case 'bus':       model = buildSchoolBus(); break;
-                    case 'traffic':   model = buildTrafficLight(extra||'red'); break;
-                }
-                if (model) dtScene.add(model);
+                console.warn('[DT] Traffic GLTF failed, using procedural fallback:', err);
+                dtScene.add(buildTrafficLight(extra || 'red'));
             });
         }
     }
@@ -2313,21 +2522,20 @@ L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDigitalTwin(); });
     window.addEventListener('resize', resizeTwin);
 
-    // Expose globally so map marker handlers can call it
+    // Expose globally
     window.openDigitalTwin = openDigitalTwin;
 
-    // ── Wire vehicle markers — click opens digital twin inline ──
-    Object.keys(vehicleRoutes).forEach(function(id) {
-        var v = vehicleRoutes[id];
-        vehicles[id].marker.on('click', function() {
-            window.openDigitalTwin(v.type, v.label);
+    // ── Wire vehicle markers — click opens digital twin ──
+    Object.keys(vehicles).forEach(function(id) {
+        vehicles[id].mapMarker.on('click', function() {
+            window.openDigitalTwin(id);
         });
     });
 
-    // ── Wire traffic light markers — click opens digital twin inline ──
+    // ── Wire traffic light markers — click opens digital twin ──
     trafficLights.forEach(function(tl) {
         tl.marker.on('click', function() {
-            window.openDigitalTwin('traffic', '\uD83D\uDEA6 ' + tl.name, tl.color);
+            window.openDigitalTwin(null, 'traffic', '\uD83D\uDEA6 ' + tl.name, tl.color);
         });
     });
 
