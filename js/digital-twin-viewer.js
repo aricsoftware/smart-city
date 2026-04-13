@@ -659,6 +659,9 @@
     // ── GLTF model file mapping ──
     var glbFiles = { police: 'models/police-car.glb', ambulance: 'models/ambulance.glb', bus: 'models/school-bus.glb', traffic: 'models/traffic-light.glb' };
     var glbLoader = new THREE.GLTFLoader();
+    var dracoLoader = new THREE.DRACOLoader();
+    dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/libs/draco/');
+    glbLoader.setDRACOLoader(dracoLoader);
 
     function addGLTFModel(gltf, targetSize) {
         var model = gltf.scene;
@@ -717,6 +720,14 @@
 
     function applyBusLivery(model, textures) {
         textures = textures || {};
+        // Correct orientation: 3ds Max Z-up OBJ export needs -90° X rotation
+        model.rotation.x = -Math.PI / 2;
+        // Re-center after rotation so the bus sits on the ground plane
+        model.updateMatrixWorld(true);
+        var box = new THREE.Box3().setFromObject(model);
+        var center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center);
+        model.position.y += box.getSize(new THREE.Vector3()).y / 2;
         // MeshPhysicalMaterial: clearcoat simulates the gloss lacquer on vehicle paint
         model.traverse(function(child) {
             if (!child.isMesh) return;
@@ -737,92 +748,6 @@
             if (textures.roughness) { mat.roughnessMap = textures.roughness; }
             child.material = mat;
         });
-
-        // ── Build APS side-panel livery canvas (512×128) ──
-        var lc = document.createElement('canvas');
-        lc.width = 512; lc.height = 128;
-        var ctx = lc.getContext('2d');
-        // Chrome yellow body
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(0, 0, 512, 128);
-        // Black band across the middle third
-        ctx.fillStyle = '#111111';
-        ctx.fillRect(0, 44, 512, 40);
-        // "ATLANTA PUBLIC SCHOOLS" in white inside the black band
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 18px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('ATLANTA PUBLIC SCHOOLS', 256, 64);
-        // Black border stripe top
-        ctx.fillStyle = '#111111';
-        ctx.fillRect(0, 0, 512, 8);
-        // Black border stripe bottom
-        ctx.fillRect(0, 120, 512, 8);
-        // Bus number panel (yellow box on left)
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(8, 12, 60, 30);
-        ctx.fillStyle = '#111111';
-        ctx.font = 'bold 22px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('42', 38, 27);
-        // APS logo hint: small red apple shape
-        ctx.fillStyle = '#CC2200';
-        ctx.beginPath(); ctx.arc(460, 28, 14, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#FFD700';
-        ctx.font = 'bold 16px Arial, sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('APS', 460, 28);
-        // "SCHOOL BUS" in black above the band
-        ctx.fillStyle = '#111111';
-        ctx.font = 'bold 15px Arial, sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('SCHOOL BUS', 256, 24);
-        // "STOP" warning text below the band
-        ctx.fillStyle = '#CC2200';
-        ctx.font = 'bold 13px Arial, sans-serif';
-        ctx.fillText('▶  STOP ON SIGNAL  ◀', 256, 106);
-
-        var lTex = new THREE.CanvasTexture(lc);
-        // Mirror for right side
-        var rc = document.createElement('canvas');
-        rc.width = 512; rc.height = 128;
-        var rCtx = rc.getContext('2d');
-        rCtx.save(); rCtx.translate(512, 0); rCtx.scale(-1, 1);
-        rCtx.drawImage(lc, 0, 0); rCtx.restore();
-        var rTex = new THREE.CanvasTexture(rc);
-
-        // ── Position decal planes flush against bus sides ──
-        model.updateMatrixWorld(true);
-        var wb   = new THREE.Box3().setFromObject(model);
-        var wSz  = wb.getSize(new THREE.Vector3());
-        var wCtr = wb.getCenter(new THREE.Vector3());
-        var s    = model.scale.x;
-        var lx   = (wCtr.x - wSz.x * 0.5 - 0.03 - model.position.x) / s;
-        var rx   = (wCtr.x + wSz.x * 0.5 + 0.03 - model.position.x) / s;
-        var ly   = (wCtr.y - model.position.y) / s;
-        var lz   = (wCtr.z - model.position.z) / s;
-        var gW   = wSz.z * 0.82 / s;
-        var gH   = wSz.y * 0.44 / s;
-
-        var leftDecal = new THREE.Mesh(
-            new THREE.PlaneGeometry(gW, gH),
-            new THREE.MeshBasicMaterial({ map: lTex, transparent: true, opacity: 0.97, depthWrite: false, side: THREE.DoubleSide })
-        );
-        leftDecal.userData.isDecal = true;
-        leftDecal.position.set(lx, ly, lz);
-        leftDecal.rotation.y = Math.PI / 2;
-        model.add(leftDecal);
-
-        var rightDecal = new THREE.Mesh(
-            new THREE.PlaneGeometry(gW, gH),
-            new THREE.MeshBasicMaterial({ map: rTex, transparent: true, opacity: 0.97, depthWrite: false, side: THREE.DoubleSide })
-        );
-        rightDecal.userData.isDecal = true;
-        rightDecal.position.set(rx, ly, lz);
-        rightDecal.rotation.y = -Math.PI / 2;
-        model.add(rightDecal);
     }
 
     // ── Register Three.js builders into DT namespace ──
