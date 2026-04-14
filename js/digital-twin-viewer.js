@@ -788,6 +788,7 @@
         clearScene();
 
         orbit.theta = 0.8; orbit.phi = 0.6; orbit.radius = 7; orbit.autoRotate = true;
+        if (resolvedType === 'bus') { orbit.radius = 2.33; }
         dtTitle.textContent = '\uD83D\uDD0D Digital Twin \u2014 ' + resolvedLabel;
 
         if (entity) {
@@ -831,18 +832,7 @@
     // Expose globally
     window.openDigitalTwin = openDigitalTwin;
 
-    // ── Wire vehicle markers — click opens digital twin ──
-    Object.keys(vehicles).forEach(function(id) {
-        vehicles[id].mapMarker.on('click', function() {
-            window.openDigitalTwin(id);
-        });
-    });
-
-    // ── Wire traffic light markers — click opens digital twin ──
-    trafficLights.forEach(function(tl) {
-        tl.marker.on('click', function() {
-            window.openDigitalTwin(null, 'traffic', '\uD83D\uDEA6 ' + tl.name, tl.color);
-        });
-    });
+    // Digital twin is now triggered via popup links (data-dt-open attribute)
+    // handled by global click delegation in app.js
 
 })();

@@ -372,9 +372,14 @@ Object.keys(vehicleRoutes).forEach(id => {
     const ic = iconConfigs[vd.type];
     const el = makeVehicleMarkerEl(ic.emoji, ic.color, ic.shadow);
     const startPos = vd.route[0];
+    const popup = new mapboxgl.Popup({ offset: 20, closeButton: true });
+    popup.on('open', () => {
+        popup.setHTML(instance._popupHTML());
+        window.openDigitalTwin(id);
+    });
     const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([startPos[1], startPos[0]])
-        .setPopup(new mapboxgl.Popup({ offset: 20, closeButton: true }).setHTML(instance._popupHTML()));
+        .setPopup(popup);
     instance.mapMarker = marker;
     instance._markerEl = el;
     vehicleMarkers.push(marker);
@@ -387,13 +392,21 @@ const tlColors = ['red', 'yellow', 'green'];
 trafficLightPositions.forEach(tl => {
     const startColor = tlColors[Math.floor(Math.random() * 3)];
     const el = makeTrafficLightEl(startColor);
+    const popup = new mapboxgl.Popup({ offset: 10 });
+    const tlRef = { marker: null, el, name: tl.name, color: startColor, popup };
+    popup.on('open', () => {
+        var c = { red: '#EF4444', yellow: '#FBBF24', green: '#10B981' }[tlRef.color];
+        popup.setHTML(
+            '<strong>🚦 ' + tlRef.name + '</strong><br>Status: <span style="color:' + c + '">' + tlRef.color.toUpperCase() + '</span>'
+        );
+        window.openDigitalTwin(null, 'traffic', '🚦 ' + tlRef.name, tlRef.color);
+    });
     const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([tl.pos[1], tl.pos[0]])
-        .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(
-            '<strong>🚦 ' + tl.name + '</strong><br>Status: <span style="color:' + (startColor === 'red' ? '#EF4444' : startColor === 'yellow' ? '#FBBF24' : '#10B981') + '">' + startColor.toUpperCase() + '</span>'
-        ));
+        .setPopup(popup);
+    tlRef.marker = marker;
     trafficMarkers.push(marker);
-    trafficLights.push({ marker, el, name: tl.name, color: startColor });
+    trafficLights.push(tlRef);
 });
 
 // ── Heatmap (simulated crime/incident density) ──
@@ -551,9 +564,7 @@ setInterval(() => {
         var c = { red: '#EF4444', yellow: '#FBBF24', green: '#10B981' }[tl.color];
         tl.el.style.background = c;
         tl.el.style.boxShadow = '0 0 8px ' + c + '88';
-        tl.marker.setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(
-            '<strong>🚦 ' + tl.name + '</strong><br>Status: <span style="color:' + c + '">' + tl.color.toUpperCase() + '</span>'
-        ));
+        // Popup HTML is refreshed on open via the 'open' event handler
     });
 }, 8000);
 
