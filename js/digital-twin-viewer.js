@@ -698,24 +698,24 @@
     }
 
     // ── Atlanta Public Schools Bus Livery (PBR + Clearcoat) ──
-    // CC0 PBR surface maps: AmbientCG PaintedMetal012 (ambientcg.com, CC0)
+    // Normal maps from Thomas Saf-T-Liner model package
     var _busTexCache = null;
     function loadBusTextures(callback) {
         if (_busTexCache) { callback(_busTexCache); return; }
         var tl = new THREE.TextureLoader();
         var cache = {};
-        var remaining = 2;
+        var remaining = 3;
         function tick() { if (--remaining === 0) { _busTexCache = cache; callback(cache); } }
         function loadMap(key, url) {
             tl.load(url, function(t) {
                 t.wrapS = t.wrapT = THREE.RepeatWrapping;
-                t.repeat.set(2, 1);
                 cache[key] = t;
                 tick();
             }, undefined, function() { tick(); }); // graceful fallback on error
         }
-        loadMap('normal',    'models/bus-normal.jpg');
-        loadMap('roughness', 'models/bus-roughness.jpg');
+        loadMap('body1Normal',    'models/bus-body1-normal.jpg');
+        loadMap('body2Normal',    'models/bus-body2-normal.jpg');
+        loadMap('interiorNormal', 'models/bus-interior-normal.jpg');
     }
 
     function applyBusLivery(model, textures) {
@@ -728,24 +728,31 @@
         var center = box.getCenter(new THREE.Vector3());
         model.position.sub(center);
         model.position.y += box.getSize(new THREE.Vector3()).y / 2;
-        // MeshPhysicalMaterial: clearcoat simulates the gloss lacquer on vehicle paint
+        // Apply per-material PBR with matching normal maps
         model.traverse(function(child) {
             if (!child.isMesh) return;
-            var n = (child.name || '').toLowerCase();
-            if (n.includes('wheel') || n.includes('tire') || n.includes('tyre') || n.includes('rim')) return;
-            if (n.includes('glass') || n.includes('window') || n.includes('windshield')) return;
+            var n = (child.material && child.material.name || '').toLowerCase();
+            var normalMap = null;
+            var color = 0xFFD700;
+            if (n.includes('body_1') || n === 'body_1') {
+                normalMap = textures.body1Normal || null;
+            } else if (n.includes('body_2') || n === 'body_2') {
+                normalMap = textures.body2Normal || null;
+            } else if (n.includes('interior')) {
+                normalMap = textures.interiorNormal || null;
+                color = 0x1a1a1a;
+            }
             var mat = new THREE.MeshPhysicalMaterial({
-                color: 0xFFD700,
+                color: color,
                 metalness: 0.05,
                 roughness: 0.38,
                 clearcoat: 0.85,
                 clearcoatRoughness: 0.12
             });
-            if (textures.normal) {
-                mat.normalMap = textures.normal;
+            if (normalMap) {
+                mat.normalMap = normalMap;
                 mat.normalScale.set(0.55, 0.55);
             }
-            if (textures.roughness) { mat.roughnessMap = textures.roughness; }
             child.material = mat;
         });
     }

@@ -99,20 +99,8 @@ class DigitalTwinBase {
 class Vehicle extends DigitalTwinBase {
     constructor(config) {
         super(config);
-        this.mapMarker = null; // Leaflet marker — set by buildMapMarker()
-    }
-
-    // Create a Leaflet marker at the route start position and add to layerGroup.
-    buildMapMarker(leafletIcon, layerGroup) {
-        const startPos = this._route.length ? this._route[0] : [0, 0];
-        this.mapMarker = L.marker(startPos, { icon: leafletIcon })
-            .bindPopup(this._popupHTML());
-        // Refresh popup content with live state every time it is opened.
-        this.mapMarker.on('popupopen', () => {
-            this.mapMarker.getPopup().setContent(this._popupHTML());
-        });
-        layerGroup.addLayer(this.mapMarker);
-        return this.mapMarker;
+        this.mapMarker = null;  // mapboxgl.Marker — set by app.js
+        this._markerEl = null;  // DOM element for the marker
     }
 
     _popupHTML() {
@@ -124,11 +112,10 @@ class Vehicle extends DigitalTwinBase {
     }
 
     updateMapPosition(lat, lng) {
-        if (this.mapMarker) this.mapMarker.setLatLng([lat, lng]);
+        if (this.mapMarker) this.mapMarker.setLngLat([lng, lat]);
     }
 
-    // Advance simulation and update the Leaflet map marker in one call.
-    // Safe to call every tick — works correctly even when speed is 0.
+    // Advance simulation and update the Mapbox marker in one call.
     tick(ticksPerSegment) {
         const pos = this.tickSimulation(ticksPerSegment);
         if (pos) this.updateMapPosition(pos.lat, pos.lng);

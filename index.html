@@ -8,12 +8,12 @@
     <!-- Tailwind CSS v4 CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Leaflet CSS & JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Mapbox GL JS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
 
-    <!-- Leaflet Heat (GIS heatmap) -->
-    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <!-- deck.gl (Google Photorealistic 3D Tiles overlay) -->
+    <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
@@ -56,14 +56,16 @@
         ::-webkit-scrollbar-track { background: #111827; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
 
-        /* Leaflet dark overrides */
-        .leaflet-popup-content-wrapper { background: #1F2937 !important; color: #E5E7EB !important; border-radius: 10px !important; }
-        .leaflet-popup-tip { background: #1F2937 !important; }
-        .leaflet-control-zoom a { background: #1F2937 !important; color: #E5E7EB !important; border-color: #374151 !important; }
-        .leaflet-control-layers { background: #1F2937 !important; color: #E5E7EB !important; border-color: #374151 !important; }
-        .leaflet-control-layers-separator { border-color: #374151 !important; }
+        /* Mapbox GL dark overrides */
+        .mapboxgl-popup-content { background: #1F2937 !important; color: #E5E7EB !important; border-radius: 10px !important; padding: 12px 14px; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
+        .mapboxgl-popup-tip { border-top-color: #1F2937 !important; }
+        .mapboxgl-popup-close-button { color: #9CA3AF; font-size: 18px; padding: 2px 6px; }
+        .mapboxgl-ctrl-group { background: #1F2937 !important; border-color: #374151 !important; }
+        .mapboxgl-ctrl-group button { background: #1F2937 !important; color: #E5E7EB !important; }
+        .mapboxgl-ctrl-group button + button { border-top: 1px solid #374151 !important; }
+        .mapboxgl-ctrl-attrib { background: rgba(17,24,39,.7) !important; color: #6B7280 !important; font-size: 10px; }
+        .mapboxgl-ctrl-attrib a { color: #9CA3AF !important; }
         .city-boundary-tooltip { background: #1F2937 !important; color: #93C5FD !important; border: 1px solid #3B82F6 !important; font-size: 11px; padding: 3px 8px; border-radius: 4px; }
-        .city-boundary-tooltip::before { border-top-color: #3B82F6 !important; }
 
         /* Pulse animation */
         @keyframes pulse-ring {
@@ -92,8 +94,11 @@
         .sidebar-open  { transform: translateX(0); }
         .sidebar-closed { transform: translateX(-100%); }
 
-        /* Map */
+        /* Map — Tailwind v4 reset overrides for Mapbox GL */
         #map { z-index: 1; }
+        .mapboxgl-map img { max-width: none !important; height: auto; }
+        .mapboxgl-canvas { max-width: none !important; max-height: none !important; }
+        .mapboxgl-map { font-size: 12px; line-height: 20px; }
 
         /* GIS Legend */
         .gis-legend { background: rgba(17,24,39,.92); backdrop-filter: blur(8px); padding: 12px 14px; border-radius: 10px; color: #D1D5DB; font-size: 12px; line-height: 1.6; border: 1px solid #374151; }
@@ -103,7 +108,7 @@
         .coord-display { background: rgba(17,24,39,.85); backdrop-filter: blur(6px); padding: 4px 10px; border-radius: 6px; font-size: 11px; color: #9CA3AF; border: 1px solid #374151; font-family: 'Inter', monospace; }
 
         /* Chart canvas — fill parent container */
-        canvas { max-width: 100%; max-height: 100%; }
+        .chart-wrap canvas { max-width: 100%; max-height: 100%; }
 
         /* Alert scroll */
         .alert-scroll { max-height: 360px; overflow-y: auto; }
@@ -139,10 +144,12 @@
         html[data-theme="light"] .hover\:text-white:hover   { color: #0F172A !important; }
         html[data-theme="light"] ::-webkit-scrollbar-track { background: #F1F5F9; }
         html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #CBD5E1; }
-        /* Leaflet */
-        html[data-theme="light"] .leaflet-popup-content-wrapper { background: #FFFFFF !important; color: #1E293B !important; }
-        html[data-theme="light"] .leaflet-popup-tip           { background: #FFFFFF !important; }
-        html[data-theme="light"] .leaflet-control-zoom a      { background: #FFFFFF !important; color: #1E293B !important; border-color: #E2E8F0 !important; }
+        /* Mapbox GL */
+        html[data-theme="light"] .mapboxgl-popup-content    { background: #FFFFFF !important; color: #1E293B !important; }
+        html[data-theme="light"] .mapboxgl-popup-tip        { border-top-color: #FFFFFF !important; }
+        html[data-theme="light"] .mapboxgl-ctrl-group        { background: #FFFFFF !important; border-color: #E2E8F0 !important; }
+        html[data-theme="light"] .mapboxgl-ctrl-group button { background: #FFFFFF !important; color: #1E293B !important; }
+        html[data-theme="light"] .mapboxgl-ctrl-attrib       { background: rgba(255,255,255,.8) !important; color: #64748B !important; }
         html[data-theme="light"] .city-boundary-tooltip       { background: #FFFFFF !important; color: #1D4ED8 !important; }
         /* GIS legend + coord display */
         html[data-theme="light"] .gis-legend         { background: rgba(255,255,255,0.95) !important; color: #334155; border-color: #E2E8F0 !important; }
@@ -493,7 +500,7 @@
                         <h3 class="text-sm font-semibold text-white">Traffic Flow (24h)</h3>
                     </div>
                 </div>
-                <div class="relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
+                <div class="chart-wrap relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
                     <canvas id="chart-traffic"></canvas>
                 </div>
             </div>
@@ -506,7 +513,7 @@
                         <h3 class="text-sm font-semibold text-white">Energy Grid (MW)</h3>
                     </div>
                 </div>
-                <div class="relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
+                <div class="chart-wrap relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
                     <canvas id="chart-energy"></canvas>
                 </div>
             </div>
@@ -519,7 +526,7 @@
                         <h3 class="text-sm font-semibold text-white">Incident Breakdown</h3>
                     </div>
                 </div>
-                <div class="relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
+                <div class="chart-wrap relative w-full" style="max-height:220px;height:28vw;min-height:140px;">
                     <canvas id="chart-crime"></canvas>
                 </div>
             </div>

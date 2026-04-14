@@ -58,30 +58,51 @@ updateClock();
 setInterval(updateClock, 1000);
 
 // ══════════════════════════════════════════
-// MAP INITIALIZATION
+// MAP INITIALIZATION (Mapbox GL JS)
 // ══════════════════════════════════════════
-const ATL_CENTER = [33.7490, -84.3880];
-const map = L.map('map', { zoomControl: true, attributionControl: false }).setView(ATL_CENTER, 13);
+mapboxgl.accessToken = 'pk.eyJ1IjoiYXJpY3NvZnR3YXJlIiwiYSI6ImNtbnh4dzlvejA3aXIycXEydDVsOTVrOXUifQ.kRp7kLbV1HSY1wK3Bb7eqQ';
+const ATL_CENTER = [-84.3880, 33.7490]; // [lng, lat] for Mapbox
 
-// ── Tile Layers ──
-const tileLayers = {
-    dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
-    }),
-    street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
-    }),
-    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19
-    })
+const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/dark-v11',
+    center: ATL_CENTER,
+    zoom: 12,
+    pitch: 0,
+    bearing: 0,
+    antialias: true
+});
+
+map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+// ── Style presets ──
+const mapStyles = {
+    dark:      'mapbox://styles/mapbox/dark-v11',
+    street:    'mapbox://styles/mapbox/streets-v12',
+    satellite: 'mapbox://styles/mapbox/satellite-streets-v12'
 };
-tileLayers.dark.addTo(map);
 let activeBaseLayer = 'dark';
 
 function setMapStyle(style) {
-    map.removeLayer(tileLayers[activeBaseLayer]);
-    tileLayers[style].addTo(map);
     activeBaseLayer = style;
+    map.setStyle(mapStyles[style]);
+    // Re-add sources/layers after style load
+    map.once('style.load', function() {
+        addBoundaryLayer();
+        addHeatmapLayer();
+        addNeighborhoodZones();
+        add3DBuildings();
+        if (style === 'satellite') {
+            add3DTerrain();
+            enable3DTiles();
+            map.easeTo({ pitch: 60, bearing: -30, duration: 1500 });
+        } else {
+            disable3DTiles();
+            map.setTerrain(null);
+            map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
+        }
+        syncLayerVisibility();
+    });
     ['dark','street','satellite'].forEach(s => {
         const btn = document.getElementById('btn-' + s);
         if (s === style) {
@@ -95,77 +116,159 @@ function setMapStyle(style) {
 // ── Coordinate display ──
 map.on('mousemove', function(e) {
     document.getElementById('coord-display').textContent =
-        'Lat: ' + e.latlng.lat.toFixed(4) + '   Lng: ' + e.latlng.lng.toFixed(4);
+        'Lat: ' + e.lngLat.lat.toFixed(4) + '   Lng: ' + e.lngLat.lng.toFixed(4);
 });
 
-// ── Attribution ──
-L.control.attribution({ prefix: false, position: 'bottomright' })
-    .addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors')
-    .addTo(map);
-
 // ── Atlanta City Limits Boundary ──
-fetch('models/atlanta-boundary.geojson')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        L.geoJSON(data, {
-            style: {
-                color: '#3B82F6',
-                weight: 2.5,
-                opacity: 0.7,
-                fillColor: '#3B82F6',
-                fillOpacity: 0.04,
-                dashArray: '8, 6'
-            },
-            onEachFeature: function(feature, layer) {
-                layer.bindTooltip('City of Atlanta', {
-                    sticky: true,
-                    className: 'city-boundary-tooltip',
-                    opacity: 0.85
-                });
-            }
-        }).addTo(map);
+let boundaryData = null;
+function addBoundaryLayer() {
+    if (!boundaryData) return;
+    if (map.getSource('atl-boundary')) return;
+    map.addSource('atl-boundary', { type: 'geojson', data: boundaryData });
+    map.addLayer({
+        id: 'atl-boundary-fill',
+        type: 'fill',
+        source: 'atl-boundary',
+        paint: { 'fill-color': '#3B82F6', 'fill-opacity': 0.04 }
     });
-
-// ══════════════════════════════════════════
-// VEHICLE ICONS
-// ══════════════════════════════════════════
-function makeVehicleIcon(emoji, color, shadowColor) {
-    return L.divIcon({
-        className: '',
-        html: `<div style="
-            background:${color};
-            width:34px;height:34px;border-radius:50%;
-            display:flex;align-items:center;justify-content:center;
-            border:2px solid ${shadowColor};
-            box-shadow:0 0 12px ${color}66;
-            font-size:17px;line-height:1;
-            transition: transform 0.4s linear;
-        ">${emoji}</div>`,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17]
+    map.addLayer({
+        id: 'atl-boundary-line',
+        type: 'line',
+        source: 'atl-boundary',
+        paint: { 'line-color': '#3B82F6', 'line-width': 2.5, 'line-opacity': 0.7, 'line-dasharray': [3, 2] }
     });
 }
+fetch('models/atlanta-boundary.geojson')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { boundaryData = data; });
 
-const icons = {
-    police:    makeVehicleIcon('🚔', '#2563EB', '#60A5FA'),
-    ambulance: makeVehicleIcon('🚑', '#DC2626', '#F87171'),
-    bus:       makeVehicleIcon('🚌', '#D97706', '#FBBF24'),
+// ── 3D Buildings ──
+function add3DBuildings() {
+    if (map.getLayer('3d-buildings')) return;
+    var layers = map.getStyle().layers;
+    var labelLayer;
+    for (var i = 0; i < layers.length; i++) {
+        if (layers[i].type === 'symbol' && layers[i].layout && layers[i].layout['text-field']) {
+            labelLayer = layers[i].id;
+            break;
+        }
+    }
+    map.addLayer({
+        id: '3d-buildings',
+        source: 'composite',
+        'source-layer': 'building',
+        filter: ['==', 'extrude', 'true'],
+        type: 'fill-extrusion',
+        minzoom: 14,
+        paint: {
+            'fill-extrusion-color': [
+                'interpolate', ['linear'], ['get', 'height'],
+                0,   '#1a2332',
+                30,  '#1e2d42',
+                80,  '#243852',
+                200, '#2a4565'
+            ],
+            'fill-extrusion-height': ['get', 'height'],
+            'fill-extrusion-base': ['get', 'min_height'],
+            'fill-extrusion-opacity': 0.92,
+            'fill-extrusion-vertical-gradient': true,
+            'fill-extrusion-ambient-occlusion-intensity': 0.75,
+            'fill-extrusion-ambient-occlusion-radius': 5,
+            'fill-extrusion-flood-light-color': '#1a3a5c',
+            'fill-extrusion-flood-light-intensity': 0.3
+        }
+    }, labelLayer);
+}
+
+// ── 3D Terrain ──
+function add3DTerrain() {
+    if (!map.getSource('mapbox-dem')) {
+        map.addSource('mapbox-dem', {
+            type: 'raster-dem',
+            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            tileSize: 512,
+            maxzoom: 14
+        });
+    }
+    map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+}
+
+// ── Google Photorealistic 3D Tiles (deck.gl overlay) ──
+const GOOGLE_MAPS_API_KEY = 'AIzaSyBU4fYA0HpRIyabUsmSZiLO1mj-6Is-HUE';
+var deckOverlay = null;
+
+function enable3DTiles() {
+    if (!deckOverlay) {
+        deckOverlay = new deck.MapboxOverlay({
+            interleaved: false,
+            layers: [
+                new deck.Tile3DLayer({
+                    id: 'google-3d-tiles',
+                    data: 'https://tile.googleapis.com/v1/3dtiles/root.json',
+                    loadOptions: {
+                        fetch: { headers: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY } }
+                    },
+                    onTilesetLoad: function(tileset) {
+                        console.log('[3D Tiles] Tileset loaded successfully');
+                    },
+                    onTileError: function(tile, url, message) {
+                        console.error('[3D Tiles] Tile error:', url, message);
+                    }
+                })
+            ]
+        });
+        map.addControl(deckOverlay);
+    } else {
+        deckOverlay.setProps({
+            layers: [
+                new deck.Tile3DLayer({
+                    id: 'google-3d-tiles',
+                    data: 'https://tile.googleapis.com/v1/3dtiles/root.json',
+                    loadOptions: {
+                        fetch: { headers: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY } }
+                    }
+                })
+            ]
+        });
+    }
+    // Hide Mapbox extrusion buildings — the 3D tiles replace them
+    if (map.getLayer('3d-buildings')) {
+        map.setLayoutProperty('3d-buildings', 'visibility', 'none');
+    }
+}
+
+function disable3DTiles() {
+    if (deckOverlay) {
+        map.removeControl(deckOverlay);
+        deckOverlay = null;
+    }
+    if (map.getLayer('3d-buildings')) {
+        map.setLayoutProperty('3d-buildings', 'visibility', 'visible');
+    }
+}
+
+// ══════════════════════════════════════════
+// VEHICLE ICONS (Mapbox markers use HTML elements)
+// ══════════════════════════════════════════
+function makeVehicleMarkerEl(emoji, color, shadowColor) {
+    var el = document.createElement('div');
+    el.style.cssText = 'background:' + color + ';width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid ' + shadowColor + ';box-shadow:0 0 12px ' + color + '66;font-size:17px;line-height:1;cursor:pointer;';
+    el.textContent = emoji;
+    return el;
+}
+
+const iconConfigs = {
+    police:    { emoji: '🚔', color: '#2563EB', shadow: '#60A5FA' },
+    ambulance: { emoji: '🚑', color: '#DC2626', shadow: '#F87171' },
+    bus:       { emoji: '🚌', color: '#D97706', shadow: '#FBBF24' }
 };
 
-// ── Traffic light icon ──
-function trafficLightIcon(color) {
-    const c = { red: '#EF4444', yellow: '#FBBF24', green: '#10B981' }[color];
-    return L.divIcon({
-        className: '',
-        html: `<div style="
-            width:14px;height:14px;border-radius:50%;
-            background:${c};
-            border:2px solid #1F2937;
-            box-shadow:0 0 8px ${c}88;
-        "></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
-    });
+// ── Traffic light marker element ──
+function makeTrafficLightEl(color) {
+    var c = { red: '#EF4444', yellow: '#FBBF24', green: '#10B981' }[color];
+    var el = document.createElement('div');
+    el.style.cssText = 'width:14px;height:14px;border-radius:50%;background:' + c + ';border:2px solid #1F2937;box-shadow:0 0 8px ' + c + '88;';
+    return el;
 }
 
 // ══════════════════════════════════════════
@@ -253,23 +356,28 @@ const trafficLightPositions = [
 ];
 
 // ══════════════════════════════════════════
-// LAYER GROUPS
+// MARKERS & LAYERS
 // ══════════════════════════════════════════
-const vehicleLayerGroup = L.layerGroup().addTo(map);
-const trafficLayerGroup = L.layerGroup().addTo(map);
-const heatmapLayer = L.layerGroup();
-const zonesLayer = L.layerGroup();
+const vehicleMarkers = [];
+const trafficMarkers = [];
 
 // ── Build Vehicle Instances ──
-// Each entry is a typed class instance (PoliceCar / Ambulance / SchoolBus).
-// The class handles route tracking, speed computation, and 3-D rendering.
 const vehicles = {};
 const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus };
 Object.keys(vehicleRoutes).forEach(id => {
     const vd  = vehicleRoutes[id];
     const Cls = _vehicleClassMap[vd.type];
     const instance = new Cls({ id: id, label: vd.label, route: vd.route });
-    instance.buildMapMarker(icons[vd.type], vehicleLayerGroup);
+    // Create Mapbox marker
+    const ic = iconConfigs[vd.type];
+    const el = makeVehicleMarkerEl(ic.emoji, ic.color, ic.shadow);
+    const startPos = vd.route[0];
+    const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([startPos[1], startPos[0]])
+        .setPopup(new mapboxgl.Popup({ offset: 20, closeButton: true }).setHTML(instance._popupHTML()));
+    instance.mapMarker = marker;
+    instance._markerEl = el;
+    vehicleMarkers.push(marker);
     vehicles[id] = instance;
 });
 
@@ -278,95 +386,158 @@ const trafficLights = [];
 const tlColors = ['red', 'yellow', 'green'];
 trafficLightPositions.forEach(tl => {
     const startColor = tlColors[Math.floor(Math.random() * 3)];
-    const marker = L.marker(tl.pos, { icon: trafficLightIcon(startColor) })
-        .bindPopup(`<strong>🚦 ${tl.name}</strong><br>Status: <span style="color:${startColor === 'red' ? '#EF4444' : startColor === 'yellow' ? '#FBBF24' : '#10B981'}">${startColor.toUpperCase()}</span>`);
-    trafficLayerGroup.addLayer(marker);
-    trafficLights.push({ marker, name: tl.name, color: startColor });
+    const el = makeTrafficLightEl(startColor);
+    const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([tl.pos[1], tl.pos[0]])
+        .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(
+            '<strong>🚦 ' + tl.name + '</strong><br>Status: <span style="color:' + (startColor === 'red' ? '#EF4444' : startColor === 'yellow' ? '#FBBF24' : '#10B981') + '">' + startColor.toUpperCase() + '</span>'
+        ));
+    trafficMarkers.push(marker);
+    trafficLights.push({ marker, el, name: tl.name, color: startColor });
 });
 
 // ── Heatmap (simulated crime/incident density) ──
-const heatData = [];
-// Concentrated around downtown
-for (let i = 0; i < 120; i++) {
-    heatData.push([
-        33.749 + (Math.random() - 0.5) * 0.04,
-        -84.388 + (Math.random() - 0.5) * 0.04,
-        Math.random() * 0.7 + 0.3
-    ]);
+const heatFeatures = [];
+function addHeatPoints(centerLat, centerLng, count, spread, minIntensity) {
+    for (var i = 0; i < count; i++) {
+        heatFeatures.push({
+            type: 'Feature',
+            properties: { intensity: Math.random() * (1 - minIntensity) + minIntensity },
+            geometry: {
+                type: 'Point',
+                coordinates: [
+                    centerLng + (Math.random() - 0.5) * spread,
+                    centerLat + (Math.random() - 0.5) * spread
+                ]
+            }
+        });
+    }
 }
-// Cluster near Bankhead
-for (let i = 0; i < 40; i++) {
-    heatData.push([
-        33.768 + (Math.random() - 0.5) * 0.02,
-        -84.430 + (Math.random() - 0.5) * 0.02,
-        Math.random() * 0.5 + 0.5
-    ]);
-}
-// Cluster near East Atlanta
-for (let i = 0; i < 30; i++) {
-    heatData.push([
-        33.740 + (Math.random() - 0.5) * 0.02,
-        -84.348 + (Math.random() - 0.5) * 0.02,
-        Math.random() * 0.5 + 0.3
-    ]);
-}
-const heat = L.heatLayer(heatData, {
-    radius: 25, blur: 20, maxZoom: 16,
-    gradient: { 0.2: '#0077C8', 0.4: '#00B4D8', 0.6: '#FFD60A', 0.8: '#FF6B35', 1.0: '#EF4444' }
-});
-heatmapLayer.addLayer(heat);
+addHeatPoints(33.749, -84.388, 120, 0.04, 0.3);
+addHeatPoints(33.768, -84.430, 40, 0.02, 0.5);
+addHeatPoints(33.740, -84.348, 30, 0.02, 0.3);
 
-// ── Neighborhood Zones (simplified GeoJSON) ──
+const heatGeoJSON = { type: 'FeatureCollection', features: heatFeatures };
+
+function addHeatmapLayer() {
+    if (map.getSource('heat-source')) return;
+    map.addSource('heat-source', { type: 'geojson', data: heatGeoJSON });
+    map.addLayer({
+        id: 'heat-layer',
+        type: 'heatmap',
+        source: 'heat-source',
+        paint: {
+            'heatmap-weight': ['get', 'intensity'],
+            'heatmap-intensity': 1.2,
+            'heatmap-radius': 25,
+            'heatmap-opacity': 0.7,
+            'heatmap-color': [
+                'interpolate', ['linear'], ['heatmap-density'],
+                0, 'rgba(0,0,0,0)',
+                0.2, '#0077C8',
+                0.4, '#00B4D8',
+                0.6, '#FFD60A',
+                0.8, '#FF6B35',
+                1.0, '#EF4444'
+            ]
+        }
+    });
+    // Start hidden (checkbox unchecked by default)
+    map.setLayoutProperty('heat-layer', 'visibility', 'none');
+}
+
+// ── Neighborhood Zones ──
 const neighborhoods = [
-    { name: 'Downtown', color: '#3B82F6', coords: [[33.743,-84.398],[33.743,-84.378],[33.760,-84.378],[33.760,-84.398]] },
-    { name: 'Midtown', color: '#8B5CF6', coords: [[33.775,-84.395],[33.775,-84.375],[33.795,-84.375],[33.795,-84.395]] },
-    { name: 'Buckhead', color: '#10B981', coords: [[33.835,-84.390],[33.835,-84.365],[33.855,-84.365],[33.855,-84.390]] },
-    { name: 'Old Fourth Ward', color: '#F59E0B', coords: [[33.758,-84.378],[33.758,-84.360],[33.770,-84.360],[33.770,-84.378]] },
-    { name: 'West End', color: '#EF4444', coords: [[33.730,-84.420],[33.730,-84.400],[33.748,-84.400],[33.748,-84.420]] },
-    { name: 'East Atlanta', color: '#EC4899', coords: [[33.730,-84.360],[33.730,-84.340],[33.748,-84.340],[33.748,-84.360]] },
+    { name: 'Downtown', color: '#3B82F6', coords: [[-84.398,33.743],[-84.378,33.743],[-84.378,33.760],[-84.398,33.760],[-84.398,33.743]] },
+    { name: 'Midtown', color: '#8B5CF6', coords: [[-84.395,33.775],[-84.375,33.775],[-84.375,33.795],[-84.395,33.795],[-84.395,33.775]] },
+    { name: 'Buckhead', color: '#10B981', coords: [[-84.390,33.835],[-84.365,33.835],[-84.365,33.855],[-84.390,33.855],[-84.390,33.835]] },
+    { name: 'Old Fourth Ward', color: '#F59E0B', coords: [[-84.378,33.758],[-84.360,33.758],[-84.360,33.770],[-84.378,33.770],[-84.378,33.758]] },
+    { name: 'West End', color: '#EF4444', coords: [[-84.420,33.730],[-84.400,33.730],[-84.400,33.748],[-84.420,33.748],[-84.420,33.730]] },
+    { name: 'East Atlanta', color: '#EC4899', coords: [[-84.360,33.730],[-84.340,33.730],[-84.340,33.748],[-84.360,33.748],[-84.360,33.730]] }
 ];
-neighborhoods.forEach(n => {
-    const polygon = L.polygon(n.coords, {
-        color: n.color, weight: 2, fillOpacity: 0.12, dashArray: '6 4'
-    }).bindPopup(`<strong>${n.name}</strong><br>Neighborhood Planning Unit`);
-    zonesLayer.addLayer(polygon);
-});
 
-// ── GIS Legend ──
-const legend = L.control({ position: 'bottomleft' });
-legend.onAdd = function () {
-    const div = L.DomUtil.create('div', 'gis-legend');
-    div.innerHTML = `
-        <h4>🗺️ Map Legend</h4>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-            <span style="font-size:15px;">🚔</span> Police Unit
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-            <span style="font-size:15px;">🚑</span> Ambulance / EMS
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-            <span style="font-size:15px;">🚌</span> School Bus
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:15px;">🚦</span> Traffic Signal
-        </div>`;
-    return div;
-};
-legend.addTo(map);
+function addNeighborhoodZones() {
+    neighborhoods.forEach(function(n, i) {
+        var srcId = 'zone-' + i;
+        if (map.getSource(srcId)) return;
+        map.addSource(srcId, {
+            type: 'geojson',
+            data: {
+                type: 'Feature',
+                properties: { name: n.name },
+                geometry: { type: 'Polygon', coordinates: [n.coords] }
+            }
+        });
+        map.addLayer({
+            id: 'zone-fill-' + i,
+            type: 'fill',
+            source: srcId,
+            paint: { 'fill-color': n.color, 'fill-opacity': 0.12 },
+            layout: { visibility: 'none' }
+        });
+        map.addLayer({
+            id: 'zone-line-' + i,
+            type: 'line',
+            source: srcId,
+            paint: { 'line-color': n.color, 'line-width': 2, 'line-dasharray': [3, 2] },
+            layout: { visibility: 'none' }
+        });
+    });
+}
+
+// ── GIS Legend (HTML overlay instead of L.control) ──
+function createLegend() {
+    var legendDiv = document.createElement('div');
+    legendDiv.className = 'gis-legend';
+    legendDiv.style.cssText = 'position:absolute;bottom:40px;left:10px;z-index:2;';
+    legendDiv.innerHTML =
+        '<h4>🗺️ Map Legend</h4>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚔</span> Police Unit</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚑</span> Ambulance / EMS</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚌</span> School Bus</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:15px;">🚦</span> Traffic Signal</div>';
+    document.getElementById('map').appendChild(legendDiv);
+}
+
+// ── Sync layer visibility with checkboxes ──
+function syncLayerVisibility() {
+    var showHeat = document.getElementById('layer-heatmap').checked;
+    var showZones = document.getElementById('layer-zones').checked;
+    if (map.getLayer('heat-layer')) {
+        map.setLayoutProperty('heat-layer', 'visibility', showHeat ? 'visible' : 'none');
+    }
+    neighborhoods.forEach(function(n, i) {
+        if (map.getLayer('zone-fill-' + i)) {
+            map.setLayoutProperty('zone-fill-' + i, 'visibility', showZones ? 'visible' : 'none');
+            map.setLayoutProperty('zone-line-' + i, 'visibility', showZones ? 'visible' : 'none');
+        }
+    });
+}
+
+// ── Add all markers to map ──
+function addAllMarkers() {
+    vehicleMarkers.forEach(function(m) { m.addTo(map); });
+    trafficMarkers.forEach(function(m) { m.addTo(map); });
+}
+
+// ── Initialize everything once the map style loads ──
+map.on('load', function() {
+    addBoundaryLayer();
+    addHeatmapLayer();
+    addNeighborhoodZones();
+    add3DBuildings();
+    addAllMarkers();
+    createLegend();
+});
 
 // ══════════════════════════════════════════
 // VEHICLE ANIMATION ENGINE
 // ══════════════════════════════════════════
-const WAYPOINT_DURATION = 30000; // 30 seconds per segment
-const TICK_INTERVAL = 400;       // Update position every 400ms
+const WAYPOINT_DURATION = 30000;
+const TICK_INTERVAL = 400;
 const TICKS_PER_SEGMENT = WAYPOINT_DURATION / TICK_INTERVAL;
 
-function lerp(a, b, t) {
-    return a + (b - a) * t;
-}
-
 function animateVehicles() {
-    // Delegates to each Vehicle instance — handles position, speed, and map update.
     Object.keys(vehicles).forEach(id => vehicles[id].tick(TICKS_PER_SEGMENT));
 }
 
@@ -377,28 +548,41 @@ setInterval(() => {
     trafficLights.forEach(tl => {
         const nextIndex = (tlColors.indexOf(tl.color) + 1) % 3;
         tl.color = tlColors[nextIndex];
-        tl.marker.setIcon(trafficLightIcon(tl.color));
+        var c = { red: '#EF4444', yellow: '#FBBF24', green: '#10B981' }[tl.color];
+        tl.el.style.background = c;
+        tl.el.style.boxShadow = '0 0 8px ' + c + '88';
+        tl.marker.setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(
+            '<strong>🚦 ' + tl.name + '</strong><br>Status: <span style="color:' + c + '">' + tl.color.toUpperCase() + '</span>'
+        ));
     });
 }, 8000);
 
 // ── Layer Toggle Checkboxes ──
 document.getElementById('layer-vehicles').addEventListener('change', function () {
-    this.checked ? map.addLayer(vehicleLayerGroup) : map.removeLayer(vehicleLayerGroup);
+    vehicleMarkers.forEach(m => { this.checked ? m.addTo(map) : m.remove(); });
 });
 document.getElementById('layer-traffic').addEventListener('change', function () {
-    this.checked ? map.addLayer(trafficLayerGroup) : map.removeLayer(trafficLayerGroup);
+    trafficMarkers.forEach(m => { this.checked ? m.addTo(map) : m.remove(); });
 });
 document.getElementById('layer-heatmap').addEventListener('change', function () {
-    this.checked ? map.addLayer(heatmapLayer) : map.removeLayer(heatmapLayer);
+    if (map.getLayer('heat-layer')) {
+        map.setLayoutProperty('heat-layer', 'visibility', this.checked ? 'visible' : 'none');
+    }
     updateGISCount();
 });
 document.getElementById('layer-zones').addEventListener('change', function () {
-    this.checked ? map.addLayer(zonesLayer) : map.removeLayer(zonesLayer);
+    var vis = this.checked ? 'visible' : 'none';
+    neighborhoods.forEach(function(n, i) {
+        if (map.getLayer('zone-fill-' + i)) {
+            map.setLayoutProperty('zone-fill-' + i, 'visibility', vis);
+            map.setLayoutProperty('zone-line-' + i, 'visibility', vis);
+        }
+    });
     updateGISCount();
 });
 
 function updateGISCount() {
-    let count = 2; // vehicles + traffic always active
+    let count = 2;
     if (document.getElementById('layer-heatmap').checked) count++;
     if (document.getElementById('layer-zones').checked) count++;
     document.getElementById('gis-layers-count').textContent = count;
@@ -619,4 +803,4 @@ setInterval(() => {
 // ══════════════════════════════════════════
 // SCALE BAR
 // ══════════════════════════════════════════
-L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo(map);
+map.addControl(new mapboxgl.ScaleControl({ maxWidth: 150, unit: 'imperial' }), 'bottom-right');
