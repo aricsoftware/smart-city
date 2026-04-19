@@ -704,18 +704,26 @@
         if (_busTexCache) { callback(_busTexCache); return; }
         var tl = new THREE.TextureLoader();
         var cache = {};
-        var remaining = 3;
+        var remaining = 9;
         function tick() { if (--remaining === 0) { _busTexCache = cache; callback(cache); } }
-        function loadMap(key, url) {
+        function loadMap(key, url, srgb) {
             tl.load(url, function(t) {
+                t.flipY = false;  // GLB UVs are authored for non-flipped textures
                 t.wrapS = t.wrapT = THREE.RepeatWrapping;
+                if (srgb) t.colorSpace = THREE.SRGBColorSpace;
                 cache[key] = t;
                 tick();
             }, undefined, function() { tick(); }); // graceful fallback on error
         }
-        loadMap('body1Normal',    'models/bus-body1-normal.jpg');
-        loadMap('body2Normal',    'models/bus-body2-normal.jpg');
-        loadMap('interiorNormal', 'models/bus-interior-normal.jpg');
+        loadMap('body1Diffuse',   'models/bus-body_1_Diffuse.jpg',   true);
+        loadMap('body1Normal',    'models/bus-body_1_Normal.jpg',    false);
+        loadMap('body1Roughness', 'models/bus-body_1_Roughness.jpg', false);
+        loadMap('body2Diffuse',   'models/bus-body_2_Diffuse.jpg',   true);
+        loadMap('body2Normal',    'models/bus-body_2_Normal.jpg',    false);
+        loadMap('body2Roughness', 'models/bus-body_2_Roughness.jpg', false);
+        loadMap('intDiffuse',     'models/bus-interior_Diffuse.jpg', true);
+        loadMap('intNormal',      'models/bus-interior_Normal.jpg',  false);
+        loadMap('intRoughness',   'models/bus-interior_Roughness.jpg', false);
     }
 
     function applyBusLivery(model, textures) {
@@ -728,30 +736,37 @@
         var center = box.getCenter(new THREE.Vector3());
         model.position.sub(center);
         model.position.y += box.getSize(new THREE.Vector3()).y / 2;
-        // Apply per-material PBR with matching normal maps
+        // Apply per-material PBR with real Thomas Saf-T-Liner textures
         model.traverse(function(child) {
             if (!child.isMesh) return;
             var n = (child.material && child.material.name || '').toLowerCase();
-            var normalMap = null;
-            var color = 0xFFD700;
+            var diffuse = null, normal = null, rough = null;
             if (n.includes('body_1') || n === 'body_1') {
-                normalMap = textures.body1Normal || null;
+                diffuse = textures.body1Diffuse   || null;
+                normal  = textures.body1Normal     || null;
+                rough   = textures.body1Roughness  || null;
             } else if (n.includes('body_2') || n === 'body_2') {
-                normalMap = textures.body2Normal || null;
+                diffuse = textures.body2Diffuse    || null;
+                normal  = textures.body2Normal     || null;
+                rough   = textures.body2Roughness  || null;
             } else if (n.includes('interior')) {
-                normalMap = textures.interiorNormal || null;
-                color = 0x1a1a1a;
+                diffuse = textures.intDiffuse      || null;
+                normal  = textures.intNormal       || null;
+                rough   = textures.intRoughness    || null;
             }
             var mat = new THREE.MeshPhysicalMaterial({
-                color: color,
+                color: 0xffffff,
                 metalness: 0.05,
-                roughness: 0.38,
+                roughness: 0.5,
                 clearcoat: 0.85,
                 clearcoatRoughness: 0.12
             });
-            if (normalMap) {
-                mat.normalMap = normalMap;
-                mat.normalScale.set(0.55, 0.55);
+            if (diffuse)  mat.map = diffuse;
+            if (normal) { mat.normalMap = normal; mat.normalScale.set(0.55, -0.55); } // negative Y: 3ds Max DirectX→OpenGL
+            if (rough)    mat.roughnessMap = rough;
+            // Fallback: no diffuse texture → use original palette colors
+            if (!diffuse) {
+                mat.color.setHex(n.includes('interior') ? 0x1a1a1a : 0xFFD700);
             }
             child.material = mat;
         });

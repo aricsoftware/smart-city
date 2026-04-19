@@ -815,3 +815,15 @@ setInterval(() => {
 // SCALE BAR
 // ══════════════════════════════════════════
 map.addControl(new mapboxgl.ScaleControl({ maxWidth: 150, unit: 'imperial' }), 'bottom-right');
+
+// ══════════════════════════════════════════
+// LIVE VEHICLE TRACKING INTEGRATION
+// ══════════════════════════════════════════
+// Initialize after map is loaded so trails and markers work.
+// Default to 'simulation' mode — switch to 'live' or 'hybrid'
+// when a real Bouncie device is connected via the relay server.
+map.on('load', function () {
+    if (typeof LiveTracking !== 'undefined') {
+        LiveTracking.init({ mode: 'simulation' });
+    }
+});
