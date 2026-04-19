@@ -776,11 +776,13 @@
     // Called once — makes the class build() / applyLivery() methods functional.
     DT._build = function(type) {
         switch (type) {
-            case 'police':    return buildPoliceCar();
-            case 'ambulance': return buildAmbulance();
-            case 'bus':       return buildSchoolBus();
-            case 'citybus':   return buildSchoolBus(); // fallback reuses school bus geometry
-            default:          return new THREE.Group();
+            case 'police':      return buildPoliceCar();
+            case 'ambulance':   return buildAmbulance();
+            case 'bus':         return buildSchoolBus();
+            case 'citybus':     return buildSchoolBus();
+            case 'firetruck':   return buildAmbulance(); // fallback reuses ambulance geometry
+            case 'laddertruck': return buildAmbulance(); // fallback reuses ambulance geometry
+            default:            return new THREE.Group();
         }
     };
     DT._applyLivery     = function(type, model) { if (type === 'police') applyAPDLivery(model); };

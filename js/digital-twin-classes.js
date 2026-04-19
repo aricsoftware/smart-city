@@ -245,13 +245,111 @@ class CityBus extends Vehicle {
     }
 }
 
+// ══ FireTruckApparatus (Pumper) ═══════════════════════════════
+class FireTruckApparatus extends Vehicle {
+    constructor(config) {
+        config.type          = 'firetruck';
+        config.badgeText     = config.badgeText   || 'AFD';
+        config.badgeColor    = config.badgeColor  || '#E11D48';
+        config.statusText    = config.statusText  || 'On Call';
+        config.iconEmoji     = '🚒';
+        config.glbFile       = 'models/fire_truck_apparatus.glb';
+        config.glbTargetSize = 3;
+        super(config);
+    }
+
+    // Override: correct Z-up OBJ export orientation.
+    addToScene(scene, glbLoader, doneCallback) {
+        if (this.glbFile) {
+            glbLoader.load(
+                this.glbFile,
+                (gltf) => {
+                    const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    model.rotation.x = -Math.PI / 2;
+                    model.updateMatrixWorld(true);
+                    var box = new THREE.Box3().setFromObject(model);
+                    var center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    model.position.y += box.getSize(new THREE.Vector3()).y / 2;
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                },
+                undefined,
+                (err) => {
+                    console.warn('[DT] Fire Truck Apparatus GLTF failed, procedural fallback:', err);
+                    const model = this.build();
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                }
+            );
+        } else {
+            const model = this.build();
+            this._scene3d = model;
+            scene.add(model);
+            if (doneCallback) doneCallback(model);
+        }
+    }
+}
+
+// ══ LadderFireTruck (Seagrave) ═══════════════════════════════
+class LadderFireTruck extends Vehicle {
+    constructor(config) {
+        config.type          = 'laddertruck';
+        config.badgeText     = config.badgeText   || 'AFD LADDER';
+        config.badgeColor    = config.badgeColor  || '#BE123C';
+        config.statusText    = config.statusText  || 'On Call';
+        config.iconEmoji     = '🚒';
+        config.glbFile       = 'models/seagrave_ladder_fire_truck.glb';
+        config.glbTargetSize = 3;
+        super(config);
+    }
+
+    // Override: correct Z-up OBJ export orientation.
+    addToScene(scene, glbLoader, doneCallback) {
+        if (this.glbFile) {
+            glbLoader.load(
+                this.glbFile,
+                (gltf) => {
+                    const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    model.rotation.x = -Math.PI / 2;
+                    model.updateMatrixWorld(true);
+                    var box = new THREE.Box3().setFromObject(model);
+                    var center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    model.position.y += box.getSize(new THREE.Vector3()).y / 2;
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                },
+                undefined,
+                (err) => {
+                    console.warn('[DT] Ladder Fire Truck GLTF failed, procedural fallback:', err);
+                    const model = this.build();
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                }
+            );
+        } else {
+            const model = this.build();
+            this._scene3d = model;
+            scene.add(model);
+            if (doneCallback) doneCallback(model);
+        }
+    }
+}
+
 // Register classes on DT namespace
-DT.DigitalTwinBase  = DigitalTwinBase;
-DT.Vehicle          = Vehicle;
-DT.PoliceCar        = PoliceCar;
-DT.Ambulance        = Ambulance;
-DT.SchoolBus        = SchoolBus;
-DT.CityBus          = CityBus;
+DT.DigitalTwinBase      = DigitalTwinBase;
+DT.Vehicle              = Vehicle;
+DT.PoliceCar            = PoliceCar;
+DT.Ambulance            = Ambulance;
+DT.SchoolBus            = SchoolBus;
+DT.CityBus              = CityBus;
+DT.FireTruckApparatus   = FireTruckApparatus;
+DT.LadderFireTruck      = LadderFireTruck;
 
 // Stubs — replaced by the Three.js IIFE once it initialises
 DT._build           = function(type)         { return null; };

@@ -258,10 +258,12 @@ function makeVehicleMarkerEl(emoji, color, shadowColor) {
 }
 
 const iconConfigs = {
-    police:    { emoji: '🚔', color: '#2563EB', shadow: '#60A5FA' },
-    ambulance: { emoji: '🚑', color: '#DC2626', shadow: '#F87171' },
-    bus:       { emoji: '🚌', color: '#D97706', shadow: '#FBBF24' },
-    citybus:   { emoji: '🚍', color: '#0891B2', shadow: '#22D3EE' }
+    police:      { emoji: '🚔', color: '#2563EB', shadow: '#60A5FA' },
+    ambulance:   { emoji: '🚑', color: '#DC2626', shadow: '#F87171' },
+    bus:         { emoji: '🚌', color: '#D97706', shadow: '#FBBF24' },
+    citybus:     { emoji: '🚍', color: '#0891B2', shadow: '#22D3EE' },
+    firetruck:   { emoji: '🚒', color: '#E11D48', shadow: '#FB7185' },
+    laddertruck: { emoji: '🚒', color: '#BE123C', shadow: '#FDA4AF' }
 };
 
 // ── Traffic light marker element ──
@@ -381,6 +383,38 @@ const vehicleRoutes = {
             [33.7340, -84.4190], [33.7290, -84.4270], [33.7340, -84.4190],
             [33.7390, -84.4110], [33.7440, -84.4030], [33.7490, -84.3950]
         ]
+    },
+    firetruck1: {
+        type: 'firetruck', label: 'AFD Engine 1 — Downtown',
+        route: [
+            [33.7530, -84.3920], [33.7560, -84.3870], [33.7590, -84.3830],
+            [33.7560, -84.3790], [33.7520, -84.3830], [33.7500, -84.3880],
+            [33.7530, -84.3920]
+        ]
+    },
+    firetruck2: {
+        type: 'firetruck', label: 'AFD Engine 7 — West End',
+        route: [
+            [33.7380, -84.4120], [33.7410, -84.4070], [33.7440, -84.4030],
+            [33.7420, -84.3980], [33.7390, -84.4010], [33.7360, -84.4070],
+            [33.7380, -84.4120]
+        ]
+    },
+    laddertruck1: {
+        type: 'laddertruck', label: 'AFD Ladder 4 — Midtown',
+        route: [
+            [33.7820, -84.3870], [33.7860, -84.3830], [33.7890, -84.3790],
+            [33.7870, -84.3750], [33.7840, -84.3780], [33.7810, -84.3830],
+            [33.7820, -84.3870]
+        ]
+    },
+    laddertruck2: {
+        type: 'laddertruck', label: 'AFD Ladder 16 — East Atlanta',
+        route: [
+            [33.7420, -84.3500], [33.7450, -84.3450], [33.7480, -84.3410],
+            [33.7460, -84.3370], [33.7430, -84.3400], [33.7400, -84.3450],
+            [33.7420, -84.3500]
+        ]
     }
 };
 
@@ -406,7 +440,7 @@ const trafficMarkers = [];
 
 // ── Build Vehicle Instances ──
 const vehicles = {};
-const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus, citybus: DT.CityBus };
+const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus, citybus: DT.CityBus, firetruck: DT.FireTruckApparatus, laddertruck: DT.LadderFireTruck };
 Object.keys(vehicleRoutes).forEach(id => {
     const vd  = vehicleRoutes[id];
     const Cls = _vehicleClassMap[vd.type];
@@ -552,6 +586,8 @@ function createLegend() {
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚑</span> Ambulance / EMS</div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚌</span> School Bus</div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚍</span> City Bus (MARTA)</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚒</span> Fire Truck (Pumper)</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚒</span> Ladder Truck</div>' +
         '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:15px;">🚦</span> Traffic Signal</div>';
     document.getElementById('map').appendChild(legendDiv);
 }
