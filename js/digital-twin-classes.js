@@ -196,12 +196,62 @@ class SchoolBus extends Vehicle {
     }
 }
 
+// ══ CityBus ══════════════════════════════════════════════════
+class CityBus extends Vehicle {
+    constructor(config) {
+        config.type          = 'citybus';
+        config.badgeText     = config.badgeText   || 'MARTA';
+        config.badgeColor    = config.badgeColor  || '#0891B2';
+        config.statusText    = config.statusText  || 'In Service';
+        config.iconEmoji     = '🚍';
+        config.glbFile       = 'models/city-bus.glb';
+        config.glbTargetSize = 3;
+        super(config);
+    }
+
+    // Override: correct Z-up OBJ export orientation so wheels sit on the ground.
+    addToScene(scene, glbLoader, doneCallback) {
+        if (this.glbFile) {
+            glbLoader.load(
+                this.glbFile,
+                (gltf) => {
+                    const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    // 3ds Max Z-up → Y-up correction
+                    model.rotation.x = -Math.PI / 2;
+                    model.updateMatrixWorld(true);
+                    var box = new THREE.Box3().setFromObject(model);
+                    var center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    model.position.y += box.getSize(new THREE.Vector3()).y / 2;
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                },
+                undefined,
+                (err) => {
+                    console.warn('[DT] City bus GLTF failed, procedural fallback:', err);
+                    const model = this.build();
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                }
+            );
+        } else {
+            const model = this.build();
+            this._scene3d = model;
+            scene.add(model);
+            if (doneCallback) doneCallback(model);
+        }
+    }
+}
+
 // Register classes on DT namespace
 DT.DigitalTwinBase  = DigitalTwinBase;
 DT.Vehicle          = Vehicle;
 DT.PoliceCar        = PoliceCar;
 DT.Ambulance        = Ambulance;
 DT.SchoolBus        = SchoolBus;
+DT.CityBus          = CityBus;
 
 // Stubs — replaced by the Three.js IIFE once it initialises
 DT._build           = function(type)         { return null; };

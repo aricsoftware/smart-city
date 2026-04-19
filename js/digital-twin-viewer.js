@@ -779,6 +779,7 @@
             case 'police':    return buildPoliceCar();
             case 'ambulance': return buildAmbulance();
             case 'bus':       return buildSchoolBus();
+            case 'citybus':   return buildSchoolBus(); // fallback reuses school bus geometry
             default:          return new THREE.Group();
         }
     };

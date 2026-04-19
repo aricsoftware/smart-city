@@ -260,7 +260,8 @@ function makeVehicleMarkerEl(emoji, color, shadowColor) {
 const iconConfigs = {
     police:    { emoji: '🚔', color: '#2563EB', shadow: '#60A5FA' },
     ambulance: { emoji: '🚑', color: '#DC2626', shadow: '#F87171' },
-    bus:       { emoji: '🚌', color: '#D97706', shadow: '#FBBF24' }
+    bus:       { emoji: '🚌', color: '#D97706', shadow: '#FBBF24' },
+    citybus:   { emoji: '🚍', color: '#0891B2', shadow: '#22D3EE' }
 };
 
 // ── Traffic light marker element ──
@@ -338,6 +339,48 @@ const vehicleRoutes = {
             [33.7730, -84.2800], [33.7770, -84.2850], [33.7780, -84.2920],
             [33.7750, -84.2960]
         ]
+    },
+    citybus1: {
+        type: 'citybus', label: 'MARTA Route 1 — Peachtree',
+        route: [
+            [33.7490, -84.3880], [33.7550, -84.3870], [33.7620, -84.3855],
+            [33.7710, -84.3855], [33.7815, -84.3835], [33.7870, -84.3840],
+            [33.7930, -84.3815], [33.7870, -84.3840], [33.7815, -84.3835],
+            [33.7710, -84.3855], [33.7620, -84.3855], [33.7550, -84.3870],
+            [33.7490, -84.3880]
+        ]
+    },
+    citybus2: {
+        type: 'citybus', label: 'MARTA Route 36 — MLK Jr Dr',
+        route: [
+            [33.7560, -84.3950], [33.7540, -84.4020], [33.7510, -84.4100],
+            [33.7490, -84.4180], [33.7470, -84.4260], [33.7490, -84.4180],
+            [33.7510, -84.4100], [33.7540, -84.4020], [33.7560, -84.3950]
+        ]
+    },
+    citybus3: {
+        type: 'citybus', label: 'MARTA Route 12 — Howell Mill',
+        route: [
+            [33.7810, -84.4100], [33.7850, -84.4060], [33.7900, -84.4020],
+            [33.7950, -84.3980], [33.8000, -84.3950], [33.7950, -84.3980],
+            [33.7900, -84.4020], [33.7850, -84.4060], [33.7810, -84.4100]
+        ]
+    },
+    citybus4: {
+        type: 'citybus', label: 'MARTA Route 21 — Memorial Dr',
+        route: [
+            [33.7460, -84.3810], [33.7440, -84.3730], [33.7420, -84.3650],
+            [33.7400, -84.3560], [33.7380, -84.3480], [33.7400, -84.3560],
+            [33.7420, -84.3650], [33.7440, -84.3730], [33.7460, -84.3810]
+        ]
+    },
+    citybus5: {
+        type: 'citybus', label: 'MARTA Route 49 — Cascade Rd',
+        route: [
+            [33.7490, -84.3950], [33.7440, -84.4030], [33.7390, -84.4110],
+            [33.7340, -84.4190], [33.7290, -84.4270], [33.7340, -84.4190],
+            [33.7390, -84.4110], [33.7440, -84.4030], [33.7490, -84.3950]
+        ]
     }
 };
 
@@ -363,7 +406,7 @@ const trafficMarkers = [];
 
 // ── Build Vehicle Instances ──
 const vehicles = {};
-const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus };
+const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus, citybus: DT.CityBus };
 Object.keys(vehicleRoutes).forEach(id => {
     const vd  = vehicleRoutes[id];
     const Cls = _vehicleClassMap[vd.type];
@@ -508,6 +551,7 @@ function createLegend() {
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚔</span> Police Unit</div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚑</span> Ambulance / EMS</div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚌</span> School Bus</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚍</span> City Bus (MARTA)</div>' +
         '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:15px;">🚦</span> Traffic Signal</div>';
     document.getElementById('map').appendChild(legendDiv);
 }
