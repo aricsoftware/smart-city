@@ -145,7 +145,7 @@ class Ambulance extends Vehicle {
         config.badgeColor    = config.badgeColor  || '#DC2626';
         config.statusText    = config.statusText  || 'En Route';
         config.iconEmoji     = '🚑';
-        config.glbFile       = 'models/ambulance.glb';
+        config.glbFile       = 'models/ambulance_optimized.glb';
         config.glbTargetSize = 3;
         super(config);
     }
