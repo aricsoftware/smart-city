@@ -805,8 +805,7 @@
         if (!dtScene) { initTwin(); }
         clearScene();
 
-        orbit.theta = 0.8; orbit.phi = 1.25; orbit.radius = 7; orbit.autoRotate = true;
-        if (resolvedType === 'bus') { orbit.radius = 2.33; }
+        orbit.theta = 0.8; orbit.phi = 1.25; orbit.radius = 4.5; orbit.autoRotate = true;
         dtTitle.textContent = '\uD83D\uDD0D Digital Twin \u2014 ' + resolvedLabel;
 
         if (entity) {
