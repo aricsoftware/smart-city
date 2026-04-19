@@ -782,6 +782,7 @@
             case 'citybus':     return buildSchoolBus();
             case 'firetruck':   return buildAmbulance(); // fallback reuses ambulance geometry
             case 'laddertruck': return buildAmbulance(); // fallback reuses ambulance geometry
+            case 'garbagetruck': return buildSchoolBus(); // fallback reuses school bus geometry
             default:            return new THREE.Group();
         }
     };

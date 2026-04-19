@@ -263,7 +263,8 @@ const iconConfigs = {
     bus:         { emoji: '🚌', color: '#D97706', shadow: '#FBBF24' },
     citybus:     { emoji: '🚍', color: '#0891B2', shadow: '#22D3EE' },
     firetruck:   { emoji: '🚒', color: '#E11D48', shadow: '#FB7185' },
-    laddertruck: { emoji: '🚒', color: '#BE123C', shadow: '#FDA4AF' }
+    laddertruck: { emoji: '🚒', color: '#BE123C', shadow: '#FDA4AF' },
+    garbagetruck: { emoji: '🗑️', color: '#16A34A', shadow: '#4ADE80' }
 };
 
 // ── Traffic light marker element ──
@@ -415,6 +416,30 @@ const vehicleRoutes = {
             [33.7460, -84.3370], [33.7430, -84.3400], [33.7400, -84.3450],
             [33.7420, -84.3500]
         ]
+    },
+    garbagetruck1: {
+        type: 'garbagetruck', label: 'Sanitation 3 — Westside',
+        route: [
+            [33.7620, -84.4150], [33.7590, -84.4090], [33.7560, -84.4030],
+            [33.7530, -84.3970], [33.7560, -84.3930], [33.7600, -84.3980],
+            [33.7640, -84.4050], [33.7660, -84.4120], [33.7620, -84.4150]
+        ]
+    },
+    garbagetruck2: {
+        type: 'garbagetruck', label: 'Sanitation 8 — Old Fourth Ward',
+        route: [
+            [33.7650, -84.3680], [33.7620, -84.3620], [33.7590, -84.3560],
+            [33.7620, -84.3520], [33.7660, -84.3570], [33.7690, -84.3630],
+            [33.7670, -84.3680], [33.7650, -84.3680]
+        ]
+    },
+    garbagetruck3: {
+        type: 'garbagetruck', label: 'Sanitation 11 — Grant Park',
+        route: [
+            [33.7330, -84.3710], [33.7360, -84.3660], [33.7390, -84.3620],
+            [33.7370, -84.3570], [33.7340, -84.3600], [33.7310, -84.3660],
+            [33.7330, -84.3710]
+        ]
     }
 };
 
@@ -440,7 +465,7 @@ const trafficMarkers = [];
 
 // ── Build Vehicle Instances ──
 const vehicles = {};
-const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus, citybus: DT.CityBus, firetruck: DT.FireTruckApparatus, laddertruck: DT.LadderFireTruck };
+const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus, citybus: DT.CityBus, firetruck: DT.FireTruckApparatus, laddertruck: DT.LadderFireTruck, garbagetruck: DT.GarbageTruck };
 Object.keys(vehicleRoutes).forEach(id => {
     const vd  = vehicleRoutes[id];
     const Cls = _vehicleClassMap[vd.type];
@@ -588,6 +613,7 @@ function createLegend() {
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚍</span> City Bus (MARTA)</div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚒</span> Fire Truck (Pumper)</div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🚒</span> Ladder Truck</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="font-size:15px;">🗑️</span> Garbage Truck</div>' +
         '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:15px;">🚦</span> Traffic Signal</div>';
     document.getElementById('map').appendChild(legendDiv);
 }

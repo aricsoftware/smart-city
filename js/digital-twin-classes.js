@@ -341,6 +341,54 @@ class LadderFireTruck extends Vehicle {
     }
 }
 
+// ══ GarbageTruck ═══════════════════════════════════════════
+class GarbageTruck extends Vehicle {
+    constructor(config) {
+        config.type          = 'garbagetruck';
+        config.badgeText     = config.badgeText   || 'SANITATION';
+        config.badgeColor    = config.badgeColor  || '#16A34A';
+        config.statusText    = config.statusText  || 'On Route';
+        config.iconEmoji     = '🗑️';
+        config.glbFile       = 'models/garbage_truck.glb';
+        config.glbTargetSize = 3;
+        super(config);
+    }
+
+    // Override: correct Z-up OBJ export orientation.
+    addToScene(scene, glbLoader, doneCallback) {
+        if (this.glbFile) {
+            glbLoader.load(
+                this.glbFile,
+                (gltf) => {
+                    const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    model.rotation.x = -Math.PI / 2;
+                    model.updateMatrixWorld(true);
+                    var box = new THREE.Box3().setFromObject(model);
+                    var center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    model.position.y += box.getSize(new THREE.Vector3()).y / 2;
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                },
+                undefined,
+                (err) => {
+                    console.warn('[DT] Garbage Truck GLTF failed, procedural fallback:', err);
+                    const model = this.build();
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                }
+            );
+        } else {
+            const model = this.build();
+            this._scene3d = model;
+            scene.add(model);
+            if (doneCallback) doneCallback(model);
+        }
+    }
+}
+
 // Register classes on DT namespace
 DT.DigitalTwinBase      = DigitalTwinBase;
 DT.Vehicle              = Vehicle;
@@ -350,6 +398,7 @@ DT.SchoolBus            = SchoolBus;
 DT.CityBus              = CityBus;
 DT.FireTruckApparatus   = FireTruckApparatus;
 DT.LadderFireTruck      = LadderFireTruck;
+DT.GarbageTruck         = GarbageTruck;
 
 // Stubs — replaced by the Three.js IIFE once it initialises
 DT._build           = function(type)         { return null; };
