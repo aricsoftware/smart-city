@@ -406,7 +406,7 @@
         <!-- ─── MAP + ACTIVITY PANEL ─── -->
         <div id="map-section" class="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <!-- Map -->
-            <div class="xl:col-span-2 bg-atl-card rounded-xl border border-atl-border overflow-hidden">
+            <div class="xl:col-span-2 bg-atl-card rounded-xl border border-atl-border overflow-hidden flex flex-col">
                 <div class="flex items-center justify-between px-4 py-3 border-b border-atl-border">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-map-location-dot text-atl-blue"></i>
@@ -418,7 +418,7 @@
                         <button onclick="setMapStyle('satellite')" class="px-2.5 py-1 rounded-md hover:bg-white/10 text-gray-400" id="btn-satellite">Satellite</button>
                     </div>
                 </div>
-                <div id="map" class="w-full" style="height: clamp(280px, 40vw, 480px);"></div>
+                <div id="map" class="w-full flex-1" style="min-height: 280px;"></div>
                 <div class="flex items-center justify-between px-4 py-2 border-t border-atl-border text-xs text-gray-500">
                     <span id="coord-display">Lat: 33.7490 &nbsp; Lng: -84.3880</span>
                     <span id="vehicle-count">Vehicles tracked: 8</span>
