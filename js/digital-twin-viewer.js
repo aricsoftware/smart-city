@@ -685,6 +685,18 @@
     // ── APD Atlanta Police Livery ──
     // Applies Atlanta Police Department charcoal + gold chevron livery to a loaded GLTF police car model.
     function applyAPDLivery(model) {
+        // Keep authored render textures (e.g., Ford Interceptor package) if any mesh already has a color map.
+        var hasAuthoredTextures = false;
+        model.traverse(function(child) {
+            if (!child.isMesh || !child.material) return;
+            if (Array.isArray(child.material)) {
+                if (child.material.some(function(m) { return m && m.map; })) hasAuthoredTextures = true;
+                return;
+            }
+            if (child.material.map) hasAuthoredTextures = true;
+        });
+        if (hasAuthoredTextures) return;
+
         // Recolor all non-wheel, non-glass meshes to APD charcoal
         var bodyMat = new THREE.MeshStandardMaterial({ color: 0x2B2D42, metalness: 0.40, roughness: 0.50 });
         model.traverse(function(child) {
