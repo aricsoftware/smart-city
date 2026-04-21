@@ -135,6 +135,40 @@ class PoliceCar extends Vehicle {
         config.glbTargetSize = 3;
         super(config);
     }
+
+    // Override: corrected orientation for Z-up authored Ford Interceptor model.
+    addToScene(scene, glbLoader, doneCallback) {
+        if (this.glbFile) {
+            glbLoader.load(
+                this.glbFile,
+                (gltf) => {
+                    const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    model.rotation.x = -Math.PI / 2;
+                    model.updateMatrixWorld(true);
+                    var box = new THREE.Box3().setFromObject(model);
+                    var center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    model.position.y += box.getSize(new THREE.Vector3()).y / 2;
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                },
+                undefined,
+                (err) => {
+                    console.warn('[DT] Police car GLTF failed, procedural fallback:', err);
+                    const model = this.build();
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+                }
+            );
+        } else {
+            const model = this.build();
+            this._scene3d = model;
+            scene.add(model);
+            if (doneCallback) doneCallback(model);
+        }
+    }
 }
 
 // ══ Ambulance ════════════════════════════════════════════════
