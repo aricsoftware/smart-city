@@ -682,6 +682,13 @@
         return model;
     }
 
+    function ensureGroundContact(model) {
+        model.updateMatrixWorld(true);
+        var box = new THREE.Box3().setFromObject(model);
+        var minY = box.min.y;
+        if (isFinite(minY)) model.position.y -= minY;
+    }
+
     // ── APD Atlanta Police Livery ──
     // Applies Atlanta Police Department charcoal + gold chevron livery to a loaded GLTF police car model.
     function applyAPDLivery(model) {
@@ -800,6 +807,7 @@
     };
     DT._applyLivery     = function(type, model) { if (type === 'police') applyAPDLivery(model); };
     DT._addGLTFModel    = addGLTFModel;
+    DT._ensureGroundContact = ensureGroundContact;
     DT._loadBusTextures = loadBusTextures;
     DT._applyBusLivery  = applyBusLivery;
 
@@ -818,7 +826,7 @@
         if (!dtScene) { initTwin(); }
         clearScene();
 
-        orbit.theta = 0.8; orbit.phi = 1.25; orbit.radius = 4.5; orbit.autoRotate = true;
+        orbit.theta = 0.8; orbit.phi = 1.25; orbit.radius = 4.5; orbit.autoRotate = false;
         dtTitle.textContent = '\uD83D\uDD0D Digital Twin \u2014 ' + resolvedLabel;
 
         if (entity) {
@@ -838,13 +846,21 @@
 
         if (entity) {
             // Vehicle instance owns its own load + build + livery logic
-            entity.addToScene(dtScene, glbLoader);
+            entity.addToScene(dtScene, glbLoader, function() {
+                orbit.autoRotate = true;
+            });
         } else if (resolvedType === 'traffic') {
             glbLoader.load(glbFiles['traffic'], function(gltf) {
-                dtScene.add(addGLTFModel(gltf, 4));
+                var model = addGLTFModel(gltf, 4);
+                ensureGroundContact(model);
+                dtScene.add(model);
+                orbit.autoRotate = true;
             }, undefined, function(err) {
                 console.warn('[DT] Traffic GLTF failed, using procedural fallback:', err);
-                dtScene.add(buildTrafficLight(extra || 'red'));
+                var model = buildTrafficLight(extra || 'red');
+                ensureGroundContact(model);
+                dtScene.add(model);
+                orbit.autoRotate = true;
             });
         }
     }

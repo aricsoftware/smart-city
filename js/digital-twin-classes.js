@@ -41,6 +41,7 @@ class DigitalTwinBase {
                 (gltf) => {
                     const model = DT._addGLTFModel(gltf, this.glbTargetSize);
                     this.applyLivery(model);
+                    DT._ensureGroundContact(model);
                     this._scene3d = model;
                     scene.add(model);
                     if (doneCallback) doneCallback(model);
@@ -49,6 +50,7 @@ class DigitalTwinBase {
                 (err) => {
                     console.warn('[DT] GLTF load failed, procedural fallback:', err);
                     const model = this.build();
+                    DT._ensureGroundContact(model);
                     this._scene3d = model;
                     scene.add(model);
                     if (doneCallback) doneCallback(model);
@@ -56,6 +58,7 @@ class DigitalTwinBase {
             );
         } else {
             const model = this.build();
+            DT._ensureGroundContact(model);
             this._scene3d = model;
             scene.add(model);
             if (doneCallback) doneCallback(model);
@@ -198,24 +201,29 @@ class SchoolBus extends Vehicle {
         super(config);
     }
 
-    // Override addToScene: bus livery requires async PBR texture loading.
+    // Override addToScene: show grounded mesh immediately, apply textures asynchronously.
     addToScene(scene, glbLoader, doneCallback) {
         if (this.glbFile) {
             glbLoader.load(
                 this.glbFile,
                 (gltf) => {
                     const model = DT._addGLTFModel(gltf, this.glbTargetSize);
+                    // Ensure wheels sit on the ground before first render.
+                    DT._ensureGroundContact(model);
+                    this._scene3d = model;
+                    scene.add(model);
+                    if (doneCallback) doneCallback(model);
+
+                    // Texture maps can arrive later without blocking initial mesh display.
                     DT._loadBusTextures((textures) => {
                         DT._applyBusLivery(model, textures);
-                        this._scene3d = model;
-                        scene.add(model);
-                        if (doneCallback) doneCallback(model);
                     });
                 },
                 undefined,
                 (err) => {
                     console.warn('[DT] Bus GLTF failed, procedural fallback:', err);
                     const model = this.build();
+                    DT._ensureGroundContact(model);
                     this._scene3d = model;
                     scene.add(model);
                     if (doneCallback) doneCallback(model);
@@ -223,6 +231,7 @@ class SchoolBus extends Vehicle {
             );
         } else {
             const model = this.build();
+            DT._ensureGroundContact(model);
             this._scene3d = model;
             scene.add(model);
             if (doneCallback) doneCallback(model);
@@ -438,5 +447,6 @@ DT.GarbageTruck         = GarbageTruck;
 DT._build           = function(type)         { return null; };
 DT._applyLivery     = function(type, model)  {};
 DT._addGLTFModel    = function(gltf, sz)     { return gltf.scene; };
+DT._ensureGroundContact = function(model)    {};
 DT._loadBusTextures = function(cb)           { cb({}); };
 DT._applyBusLivery  = function(model, tex)   {};
