@@ -13,7 +13,7 @@
     var dtClose   = document.getElementById('dt-close');
     console.log('[DT] elements:', { section: !!dtSection, canvas: !!dtCanvas, title: !!dtTitle, close: !!dtClose });
 
-    var dtScene, dtCamera, dtRenderer, dtAnimId;
+    var dtScene, dtCamera, dtRenderer, dtAnimId, keyLight;
 
     // ── Simple Orbit Controller (replaces OrbitControls) ──
     var orbit = { theta: 0.8, phi: 0.6, radius: 7, target: {x:0,y:0.5,z:0}, autoRotate: false, dragging: false, lastX: 0, lastY: 0 };
@@ -26,6 +26,9 @@
             orbit.target.z + orbit.radius * sp * Math.cos(orbit.theta)
         );
         dtCamera.lookAt(orbit.target.x, orbit.target.y, orbit.target.z);
+        if (keyLight) {
+            keyLight.position.copy(dtCamera.position);
+        }
     }
 
     function onPointerDown(e) { orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY; orbit.autoRotate = false; }
@@ -107,14 +110,14 @@
         updateCameraFromOrbit();
 
         // Key light (sun)
-        var key = new THREE.DirectionalLight(0xffeedd, 1.2);
-        key.position.set(6, 10, 6); key.castShadow = true;
-        key.shadow.mapSize.width = 1024; key.shadow.mapSize.height = 1024;
-        key.shadow.camera.near = 0.5; key.shadow.camera.far = 30;
-        key.shadow.camera.left = -6; key.shadow.camera.right = 6;
-        key.shadow.camera.top = 6; key.shadow.camera.bottom = -6;
-        key.shadow.bias = -0.001;
-        dtScene.add(key);
+        keyLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+        keyLight.position.set(6, 10, 6); keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 1024; keyLight.shadow.mapSize.height = 1024;
+        keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 30;
+        keyLight.shadow.camera.left = -6; keyLight.shadow.camera.right = 6;
+        keyLight.shadow.camera.top = 6; keyLight.shadow.camera.bottom = -6;
+        keyLight.shadow.bias = -0.001;
+        dtScene.add(keyLight);
         // Fill light
         var fill = new THREE.DirectionalLight(0x8899cc, 0.5);
         fill.position.set(-4, 4, -3); dtScene.add(fill);
