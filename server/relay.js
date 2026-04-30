@@ -5,6 +5,7 @@
 // ══════════════════════════════════════════════════════════════
 // Receives Bouncie webhook events via HTTP POST and broadcasts
 // them to all connected dashboard clients over WebSocket.
+// Also proxies the MARTA real-time bus API to avoid CORS.
 //
 // Usage:
 //   BOUNCIE_WEBHOOK_SECRET=your_secret node server/relay.js
@@ -15,7 +16,26 @@
 // ══════════════════════════════════════════════════════════════
 
 const http = require('http');
+const https = require('https');
 const crypto = require('crypto');
+
+// ── MARTA real-time bus API (public, no auth required) ───────
+const MARTA_BUS_URL = 'https://developer.itsmarta.com/BRDRestService/RestBusQuerierService/GetAllBus';
+
+function fetchMartaBuses(callback) {
+    https.get(MARTA_BUS_URL, { headers: { 'Accept': 'application/json' } }, (resp) => {
+        let raw = '';
+        resp.on('data', (chunk) => { raw += chunk; });
+        resp.on('end', () => {
+            try {
+                const buses = JSON.parse(raw);
+                callback(null, buses);
+            } catch (e) {
+                callback(e, null);
+            }
+        });
+    }).on('error', (e) => callback(e, null));
+}
 
 const PORT = parseInt(process.env.PORT, 10) || 3001;
 const WEBHOOK_SECRET = process.env.BOUNCIE_WEBHOOK_SECRET || '';
@@ -171,6 +191,21 @@ const server = http.createServer((req, res) => {
                 res.writeHead(400);
                 res.end('Invalid JSON');
             }
+        });
+        return;
+    }
+
+    // MARTA real-time bus proxy — avoids browser CORS restrictions
+    if (req.method === 'GET' && req.url === '/marta/buses') {
+        fetchMartaBuses((err, buses) => {
+            if (err) {
+                console.error('[MARTA] Fetch error:', err.message);
+                res.writeHead(502, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'MARTA API unavailable', detail: err.message }));
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(buses));
         });
         return;
     }
