@@ -686,22 +686,6 @@ function getTrackingRelayWsUrl() {
     return 'wss://smart-city-relay.onrender.com/ws';
 }
 
-function getTrackingRelayHttpUrl() {
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-        return 'http://localhost:3001';
-    }
-    return 'https://smart-city-relay.onrender.com';
-}
-
-function initBouncieSetupChecklist() {
-    var wsEl = document.getElementById('bouncie-ws-url');
-    var webhookEl = document.getElementById('bouncie-webhook-url');
-    if (!wsEl || !webhookEl) return;
-
-    wsEl.textContent = getTrackingRelayWsUrl();
-    webhookEl.textContent = getTrackingRelayHttpUrl() + '/webhook/bouncie';
-}
-
 function initTrackingModeSwitch() {
     var modeSel = document.getElementById('tracking-mode');
     if (!modeSel) return;
@@ -1008,7 +992,6 @@ map.addControl(new mapboxgl.ScaleControl({ maxWidth: 150, unit: 'imperial' }), '
 // when a real Bouncie device is connected via the relay server.
 map.on('load', function () {
     initTrackingModeSwitch();
-    initBouncieSetupChecklist();
     if (typeof LiveTracking !== 'undefined') {
         LiveTracking.init({ mode: 'simulation' });
     }
