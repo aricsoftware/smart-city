@@ -94,11 +94,13 @@ function wsBroadcast(jsonStr) {
 function validateSignature(body, signature) {
     if (!WEBHOOK_SECRET) return true; // skip if no secret configured
     if (!signature) return false;
+    const provided = String(signature).trim().replace(/^sha256=/i, '');
     const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)
         .update(body).digest('hex');
+    if (provided.length !== expected.length) return false;
     return crypto.timingSafeEqual(
-        Buffer.from(signature, 'utf8'),
-        Buffer.from(expected, 'utf8')
+        Buffer.from(provided, 'hex'),
+        Buffer.from(expected, 'hex')
     );
 }
 
@@ -162,16 +164,20 @@ const server = http.createServer((req, res) => {
                 return;
             }
 
-            // Normalize Bouncie event into a standard telemetry message
-            const telemetry = normalizeBouncie(data);
-            if (telemetry) {
+            // Normalize Bouncie event(s) into standard telemetry messages
+            const telemetryEvents = normalizeBouncieEvents(data);
+            telemetryEvents.forEach((telemetry) => {
                 const msg = JSON.stringify(telemetry);
                 wsBroadcast(msg);
                 console.log('[Webhook] Broadcast to', wsClients.size, 'clients:', telemetry.eventType);
+            });
+
+            if (telemetryEvents.length === 0) {
+                console.warn('[Webhook] No recognized telemetry in payload');
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ received: true }));
+            res.end(JSON.stringify({ received: true, events: telemetryEvents.length }));
         });
         return;
     }
@@ -224,23 +230,49 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 // ── Bouncie Event Normalization ──────────────────────────────
-function normalizeBouncie(raw) {
-    // Bouncie sends different event types: tripData, tripStart, tripEnd, tripMetrics
-    const eventType = raw.eventType || raw.type || 'unknown';
+function normalizeBouncieEvents(raw) {
+    const payload = (raw && typeof raw === 'object' && raw.data) ? raw.data : raw;
+    const candidates = Array.isArray(payload) ? payload : [payload];
+    const out = [];
 
-    if (eventType === 'tripData' || eventType === 'tripUpdate') {
-        // Real-time position update during an active trip
-        const gps = raw.gps || raw.location || {};
+    candidates.forEach((item) => {
+        const evt = normalizeBouncieEvent(item, raw);
+        if (evt) out.push(evt);
+    });
+
+    return out;
+}
+
+function normalizeBouncieEvent(item, envelope) {
+    if (!item || typeof item !== 'object') return null;
+
+    const eventType = item.eventType || item.type || item.event ||
+        (envelope && (envelope.eventType || envelope.type || envelope.event)) || 'unknown';
+
+    const gps = item.gps || item.location || item.position || {};
+    const lat = parseFloat(item.lat || item.latitude || gps.lat || gps.latitude || 0);
+    const lng = parseFloat(item.lng || item.lon || item.longitude || gps.lng || gps.lon || gps.longitude || 0);
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+
+    const deviceObj = item.device || {};
+    const vehicleObj = item.vehicle || {};
+    const deviceId = item.imei || item.deviceId || deviceObj.imei || deviceObj.id || item.transactionId || 'unknown';
+    const vehicleId = item.vin || item.nickName || item.nickname || vehicleObj.vin || vehicleObj.name || null;
+    const timestamp = item.timestamp || item.eventTime || item.createdAt || new Date().toISOString();
+
+    // Position updates may come as tripData/tripUpdate, or without an explicit event type.
+    if (eventType === 'tripData' || eventType === 'tripUpdate' || eventType === 'position' || hasCoords) {
+        if (!hasCoords) return null;
         return {
             eventType: 'position',
             source: 'bouncie',
-            deviceId: raw.imei || raw.deviceId || raw.transactionId || 'unknown',
-            vehicleId: raw.vin || raw.nickName || null,
-            timestamp: raw.timestamp || new Date().toISOString(),
-            lat: parseFloat(gps.lat || gps.latitude || 0),
-            lng: parseFloat(gps.lon || gps.lng || gps.longitude || 0),
-            speed: parseFloat(raw.speed || gps.speed || 0), // mph
-            heading: parseFloat(raw.heading || gps.heading || 0),
+            deviceId: deviceId,
+            vehicleId: vehicleId,
+            timestamp: timestamp,
+            lat: lat,
+            lng: lng,
+            speed: parseFloat(item.speed || gps.speed || 0),
+            heading: parseFloat(item.heading || gps.heading || 0),
             altitude: parseFloat(gps.altitude || gps.alt || 0)
         };
     }
@@ -249,20 +281,20 @@ function normalizeBouncie(raw) {
         return {
             eventType: 'tripStart',
             source: 'bouncie',
-            deviceId: raw.imei || raw.deviceId || 'unknown',
-            vehicleId: raw.vin || raw.nickName || null,
-            timestamp: raw.timestamp || new Date().toISOString()
+            deviceId: deviceId,
+            vehicleId: vehicleId,
+            timestamp: timestamp
         };
     }
 
     if (eventType === 'tripEnd') {
-        const stats = raw.stats || {};
+        const stats = item.stats || {};
         return {
             eventType: 'tripEnd',
             source: 'bouncie',
-            deviceId: raw.imei || raw.deviceId || 'unknown',
-            vehicleId: raw.vin || raw.nickName || null,
-            timestamp: raw.timestamp || new Date().toISOString(),
+            deviceId: deviceId,
+            vehicleId: vehicleId,
+            timestamp: timestamp,
             distance: stats.distance || 0,
             avgSpeed: stats.avgSpeed || 0,
             maxSpeed: stats.maxSpeed || 0,
@@ -271,28 +303,22 @@ function normalizeBouncie(raw) {
         };
     }
 
-    if (eventType === 'tripMetrics') {
+    if (eventType === 'tripMetrics' || eventType === 'metrics') {
         return {
             eventType: 'metrics',
             source: 'bouncie',
-            deviceId: raw.imei || raw.deviceId || 'unknown',
-            vehicleId: raw.vin || raw.nickName || null,
-            timestamp: raw.timestamp || new Date().toISOString(),
-            rpm: raw.rpm || null,
-            fuelLevel: raw.fuelLevel || null,
-            coolantTemp: raw.coolantTemp || null,
-            batteryVoltage: raw.batteryVoltage || null,
-            dtcCodes: raw.dtcCodes || []
+            deviceId: deviceId,
+            vehicleId: vehicleId,
+            timestamp: timestamp,
+            rpm: item.rpm || null,
+            fuelLevel: item.fuelLevel || null,
+            coolantTemp: item.coolantTemp || null,
+            batteryVoltage: item.batteryVoltage || null,
+            dtcCodes: item.dtcCodes || []
         };
     }
 
-    // Pass through unknown events with a generic wrapper
-    return {
-        eventType: eventType,
-        source: 'bouncie',
-        timestamp: raw.timestamp || new Date().toISOString(),
-        raw: raw
-    };
+    return null;
 }
 
 // ── Start ────────────────────────────────────────────────────

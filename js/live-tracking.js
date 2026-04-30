@@ -112,6 +112,9 @@ var LiveTracking = (function () {
 
     // ── Position Update Handler ──
     function _handlePosition(data) {
+        if (!data || !Number.isFinite(Number(data.lat)) || !Number.isFinite(Number(data.lng))) return;
+        if (Number(data.lat) === 0 && Number(data.lng) === 0) return;
+
         var vehicleId = data.vehicleId || BouncieClient.getVehicleId(data.deviceId);
 
         // If this vehicle is already managed by the app.js animation engine,
