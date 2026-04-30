@@ -16,11 +16,13 @@ var LiveTracking = (function () {
     var _liveVehicles = {};    // deviceId → { marker, trail, lastPos, ... }
     var _trailMaxPoints = 100; // max breadcrumb positions per vehicle
     var _originalAnimateInterval = null; // store ref to pause simulated animation
+    var _liveMarkersVisible = true;
 
     // ── Initialize ──
     function init(options) {
         options = options || {};
         _mode = options.mode || 'simulation';
+        _liveMarkersVisible = _isVehicleLayerEnabled();
 
         // Create status indicator in the DOM
         _createStatusUI();
@@ -43,6 +45,7 @@ var LiveTracking = (function () {
         // and stand ready to switch to 'live' or 'hybrid' mode.
 
         _active = true;
+        _applyModeToUI();
         console.log('[LiveTracking] Initialized in ' + _mode + ' mode');
     }
 
@@ -68,7 +71,21 @@ var LiveTracking = (function () {
         // 'simulation' mode: existing animation engine handles movement
 
         _updateStatusUI();
+        _applyModeToUI();
         console.log('[LiveTracking] Mode changed: ' + prev + ' → ' + mode);
+    }
+
+    function _applyModeToUI() {
+        if (typeof window.setTrackingModeUI === 'function') {
+            window.setTrackingModeUI(_mode);
+        }
+        // In live mode, only show detected vehicles.
+        setLiveMarkersVisible(_isVehicleLayerEnabled());
+    }
+
+    function _isVehicleLayerEnabled() {
+        var cb = document.getElementById('layer-vehicles');
+        return !cb || cb.checked;
     }
 
     // ── Connect to Relay Server ──
@@ -146,8 +163,11 @@ var LiveTracking = (function () {
 
         var marker = new mapboxgl.Marker({ element: el })
             .setLngLat([data.lng, data.lat])
-            .setPopup(popup)
-            .addTo(map);
+            .setPopup(popup);
+
+        if (_liveMarkersVisible) {
+            marker.addTo(map);
+        }
 
         _liveVehicles[vehicleId] = {
             marker: marker,
@@ -334,6 +354,19 @@ var LiveTracking = (function () {
         return lv ? lv.trail : [];
     }
 
+    function setLiveMarkersVisible(visible) {
+        _liveMarkersVisible = !!visible;
+        Object.keys(_liveVehicles).forEach(function (vehicleId) {
+            var lv = _liveVehicles[vehicleId];
+            if (!lv || !lv.marker) return;
+            if (_liveMarkersVisible) {
+                lv.marker.addTo(map);
+            } else {
+                lv.marker.remove();
+            }
+        });
+    }
+
     // ── Utility ──
     function _escapeHtml(str) {
         var div = document.createElement('div');
@@ -345,6 +378,7 @@ var LiveTracking = (function () {
     return {
         init: init,
         setMode: setMode,
+        setLiveMarkersVisible: setLiveMarkersVisible,
         getVehicleData: getVehicleData,
         getTrail: getTrail,
         isActive: function () { return _active; },

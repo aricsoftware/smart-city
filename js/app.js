@@ -463,6 +463,9 @@ const trafficLightPositions = [
 const vehicleMarkers = [];
 const trafficMarkers = [];
 
+// Track whether we should render the simulated/static fleet markers.
+var trackingMode = 'simulation';
+
 // ── Build Vehicle Instances ──
 const vehicles = {};
 const _vehicleClassMap = { police: DT.PoliceCar, ambulance: DT.Ambulance, bus: DT.SchoolBus, citybus: DT.CityBus, firetruck: DT.FireTruckApparatus, laddertruck: DT.LadderFireTruck, garbagetruck: DT.GarbageTruck };
@@ -639,6 +642,29 @@ function addAllMarkers() {
     trafficMarkers.forEach(function(m) { m.addTo(map); });
 }
 
+function _isVehicleLayerEnabled() {
+    var cb = document.getElementById('layer-vehicles');
+    return !cb || cb.checked;
+}
+
+function setSimulatedVehicleMarkersVisible(visible) {
+    Object.keys(vehicles).forEach(function (id) {
+        var marker = vehicles[id] && vehicles[id].mapMarker;
+        if (!marker) return;
+        if (visible && _isVehicleLayerEnabled()) {
+            marker.addTo(map);
+        } else {
+            marker.remove();
+        }
+    });
+}
+
+// Called by LiveTracking when mode changes.
+window.setTrackingModeUI = function (mode) {
+    trackingMode = mode || 'simulation';
+    setSimulatedVehicleMarkersVisible(trackingMode !== 'live');
+};
+
 // ── Initialize everything once the map style loads ──
 map.on('load', function() {
     addBoundaryLayer();
@@ -676,7 +702,10 @@ setInterval(() => {
 
 // ── Layer Toggle Checkboxes ──
 document.getElementById('layer-vehicles').addEventListener('change', function () {
-    vehicleMarkers.forEach(m => { this.checked ? m.addTo(map) : m.remove(); });
+    setSimulatedVehicleMarkersVisible(this.checked && trackingMode !== 'live');
+    if (typeof LiveTracking !== 'undefined' && LiveTracking.setLiveMarkersVisible) {
+        LiveTracking.setLiveMarkersVisible(this.checked);
+    }
 });
 document.getElementById('layer-traffic').addEventListener('change', function () {
     trafficMarkers.forEach(m => { this.checked ? m.addTo(map) : m.remove(); });
