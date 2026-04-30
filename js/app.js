@@ -663,7 +663,40 @@ function setSimulatedVehicleMarkersVisible(visible) {
 window.setTrackingModeUI = function (mode) {
     trackingMode = mode || 'simulation';
     setSimulatedVehicleMarkersVisible(trackingMode !== 'live');
+    var modeSel = document.getElementById('tracking-mode');
+    var modeHint = document.getElementById('tracking-mode-hint');
+    if (modeSel && modeSel.value !== trackingMode) {
+        modeSel.value = trackingMode;
+    }
+    if (modeHint) {
+        if (trackingMode === 'live') {
+            modeHint.textContent = 'Showing detected Bouncie vehicles only.';
+        } else if (trackingMode === 'hybrid') {
+            modeHint.textContent = 'Showing simulated and detected vehicles.';
+        } else {
+            modeHint.textContent = 'Showing simulated fleet.';
+        }
+    }
 };
+
+function getTrackingRelayWsUrl() {
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        return 'ws://localhost:3001/ws';
+    }
+    return 'wss://smart-city-relay.onrender.com/ws';
+}
+
+function initTrackingModeSwitch() {
+    var modeSel = document.getElementById('tracking-mode');
+    if (!modeSel) return;
+
+    modeSel.addEventListener('change', function () {
+        var nextMode = this.value;
+        if (typeof LiveTracking === 'undefined') return;
+        LiveTracking.setMode(nextMode, getTrackingRelayWsUrl());
+        window.setTrackingModeUI(nextMode);
+    });
+}
 
 // ── Initialize everything once the map style loads ──
 map.on('load', function() {
@@ -958,6 +991,7 @@ map.addControl(new mapboxgl.ScaleControl({ maxWidth: 150, unit: 'imperial' }), '
 // Default to 'simulation' mode — switch to 'live' or 'hybrid'
 // when a real Bouncie device is connected via the relay server.
 map.on('load', function () {
+    initTrackingModeSwitch();
     if (typeof LiveTracking !== 'undefined') {
         LiveTracking.init({ mode: 'simulation' });
     }
